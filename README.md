@@ -9,17 +9,27 @@ Import [Overture Maps](https://overturemaps.org/) data into PostGIS using DuckDB
 ## Quick Start
 
 ```bash
-./start.sh
+./start.sh --drop           # fresh import
+./start.sh places --drop    # just places
+./start.sh divisions        # divisions (skip if exists)
 ```
 
 ## Manual Import
 
 ```bash
 docker compose up -d
-docker compose exec -t server python /scripts/import.py           # all
-docker compose exec -t server python /scripts/import.py places    # just places
-docker compose exec -t server python /scripts/import.py divisions # just divisions
+docker compose exec -t server python /scripts/import.py                  # all (skip if exists)
+docker compose exec -t server python /scripts/import.py --drop           # all (fresh)
+docker compose exec -t server python /scripts/import.py places --drop    # just places (fresh)
 ```
+
+## Options
+
+| Flag | Description |
+|------|-------------|
+| `--drop` | Drop and recreate tables before import |
+
+Without `--drop`, import is skipped if the table already exists.
 
 ## Database
 
@@ -46,7 +56,7 @@ Add a SQL file to `scripts/sql/`:
 CALL postgres_execute('pg', 'DROP TABLE IF EXISTS mytable');
 
 CALL postgres_execute('pg', '
-    CREATE TABLE mytable (
+    CREATE TABLE IF NOT EXISTS mytable (
         id text PRIMARY KEY,
         geography geography
     )
@@ -56,7 +66,7 @@ INSERT INTO pg.public.mytable (id, geography)
 SELECT id, geometry
 FROM read_parquet('s3://overturemaps-us-west-2/release/2026-01-21.0/theme=...');
 
-CALL postgres_execute('pg', 'CREATE INDEX mytable_geography_idx ON mytable USING GIST (geography)')
+CALL postgres_execute('pg', 'CREATE INDEX IF NOT EXISTS mytable_geography_idx ON mytable USING GIST (geography)')
 ```
 
-Then run: `docker compose exec -t server python /scripts/import.py mytable`
+Then run: `docker compose exec -t server python /scripts/import.py mytable --drop`

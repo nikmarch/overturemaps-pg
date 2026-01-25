@@ -23,18 +23,34 @@ SETUP = f"""
 """
 
 
-def execute_sql(con, sql):
+def execute_sql(con, sql, drop=False):
     for statement in sql.split(";"):
         statement = statement.strip()
-        if statement:
-            con.execute(statement)
+        if not statement:
+            continue
+        if "DROP TABLE" in statement and not drop:
+            continue
+        con.execute(statement)
+
+
+def table_exists(con, table):
+    result = con.execute(f"""
+        SELECT COUNT(*) FROM postgres_query('pg',
+            'SELECT 1 FROM information_schema.tables WHERE table_name = ''{table}'''
+        )
+    """).fetchone()
+    return result[0] > 0
 
 
 def main():
     sql_dir = Path(__file__).parent / "sql"
 
-    if len(sys.argv) > 1:
-        sql_files = [sql_dir / f"{sys.argv[1]}.sql"]
+    args = sys.argv[1:]
+    drop = "--drop" in args
+    names = [a for a in args if not a.startswith("--")]
+
+    if names:
+        sql_files = [sql_dir / f"{name}.sql" for name in names]
     else:
         sql_files = sorted(sql_dir.glob("*.sql"))
 
@@ -42,8 +58,14 @@ def main():
     execute_sql(con, SETUP)
 
     for sql_path in sql_files:
+        table = sql_path.stem
+
+        if not drop and table_exists(con, table):
+            print(f"Skipping {sql_path.name} (table exists, use --drop to reimport)")
+            continue
+
         print(f"Running {sql_path.name}...")
-        execute_sql(con, sql_path.read_text())
+        execute_sql(con, sql_path.read_text(), drop=drop)
         print(f"Done {sql_path.name}")
 
     con.close()
