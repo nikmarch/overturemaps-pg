@@ -17,7 +17,8 @@
       "Bash(do echo -n \"$tag: \")",
       "Bash(done)",
       "WebFetch(domain:duckdb.org)",
-      "WebFetch(domain:docs.overturemaps.org)"
+      "WebFetch(domain:docs.overturemaps.org)",
+      "Bash(docker compose:*)"
     ]
   }
 }
