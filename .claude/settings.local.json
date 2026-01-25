@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git symbolic-ref:*)",
+      "Bash(git config:*)",
+      "Bash(echo:*)",
+      "Bash(gh repo create:*)"
+    ]
+  }
+}
