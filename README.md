@@ -2,15 +2,15 @@
 
 Import [Overture Maps](https://overturemaps.org/) data into PostGIS using DuckDB.
 
+## Requirements
+
+- Docker
+
 ## Quick Start
 
 ```bash
 ./start.sh
 ```
-
-This will:
-1. Start PostGIS and the import server
-2. Import places and divisions from Overture Maps S3
 
 ## Manual Import
 
@@ -21,28 +21,42 @@ docker compose exec -t server python /scripts/import.py places    # just places
 docker compose exec -t server python /scripts/import.py divisions # just divisions
 ```
 
-## Connect to Database
+## Database
 
 ```bash
 docker compose exec db psql -U postgres -d overturemaps
 ```
 
+Connection: `postgres://postgres:postgres@localhost:5432/overturemaps`
+
 ## Tables
 
 | Table | Columns | Source |
 |-------|---------|--------|
-| `places` | id, geography, name | Overture places |
-| `divisions` | id, geography, osm_id | Overture division_area |
+| `places` | id, geography, name | [places](https://docs.overturemaps.org/guides/places/) |
+| `divisions` | id, geography, osm_id | [divisions](https://docs.overturemaps.org/guides/divisions/) |
 
-Uses `geography` type for accurate distance/area calculations in meters. Both tables have GIST indexes on geography.
+Both tables use `geography` type (accurate distance/area in meters) with GIST indexes.
 
-## Example Queries
+## Adding New Imports
+
+Add a SQL file to `scripts/sql/`:
 
 ```sql
--- Find places within 1km of a point
-SELECT name FROM places
-WHERE ST_DWithin(geography, ST_MakePoint(-122.4194, 37.7749)::geography, 1000);
+CALL postgres_execute('pg', 'DROP TABLE IF EXISTS mytable');
 
--- Calculate area in square meters
-SELECT osm_id, ST_Area(geography) as area_m2 FROM divisions LIMIT 5;
+CALL postgres_execute('pg', '
+    CREATE TABLE mytable (
+        id text PRIMARY KEY,
+        geography geography
+    )
+');
+
+INSERT INTO pg.public.mytable (id, geography)
+SELECT id, geometry
+FROM read_parquet('s3://overturemaps-us-west-2/release/2026-01-21.0/theme=...');
+
+CALL postgres_execute('pg', 'CREATE INDEX mytable_geography_idx ON mytable USING GIST (geography)')
 ```
+
+Then run: `docker compose exec -t server python /scripts/import.py mytable`
