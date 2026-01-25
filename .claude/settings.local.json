@@ -15,7 +15,9 @@
       "Bash(docker manifest inspect:*)",
       "Bash(for tag in \"17-3.5-alpine\" \"17-3.6-alpine\" \"17-3.6\" \"16-3.5\" \"16-3.5-alpine\")",
       "Bash(do echo -n \"$tag: \")",
-      "Bash(done)"
+      "Bash(done)",
+      "WebFetch(domain:duckdb.org)",
+      "WebFetch(domain:docs.overturemaps.org)"
     ]
   }
 }
