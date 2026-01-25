@@ -1,0 +1,28 @@
+services:
+  db:
+    image: postgis/postgis:17-3.5
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: overturemaps
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  duckdb:
+    build: .
+    depends_on:
+      - db
+    volumes:
+      - ./data:/data
+      - ./scripts:/scripts
+    environment:
+      PGHOST: db
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: overturemaps
+
+volumes:
+  pgdata:
