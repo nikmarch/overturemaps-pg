@@ -16,8 +16,7 @@ services:
     depends_on:
       - db
     volumes:
-      - ./data:/data
-      - ./scripts:/scripts
+      - .:/app
     environment:
       PGHOST: db
       PGPORT: 5432
