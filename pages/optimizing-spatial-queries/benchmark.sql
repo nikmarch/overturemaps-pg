@@ -1,3 +1,9 @@
+-- Performance tuning (session-level)
+SET work_mem = '1GB';
+SET effective_cache_size = '12GB';
+SET max_parallel_workers_per_gather = 4;
+SET random_page_cost = 1.1;  -- for SSD
+
 \timing on
 
 -- Argentina
