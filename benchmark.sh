@@ -3,7 +3,7 @@
 # Run a benchmark script inside the Docker container
 #
 # Usage:
-#   ./benchmark.sh pages/optimizing-spatial-queries/run.py [args...]
+#   ./benchmark.sh pages/optimizing-spatial-queries/benchmark.sql
 #
 
 set -e
@@ -11,9 +11,9 @@ set -e
 if [ -z "$1" ]; then
     echo "Usage: ./benchmark.sh <script-path> [args...]"
     echo ""
-    echo "Example:"
-    echo "  ./benchmark.sh pages/optimizing-spatial-queries/run.py"
-    echo "  ./benchmark.sh pages/optimizing-spatial-queries/run.py --restart"
+    echo "Examples:"
+    echo "  ./benchmark.sh pages/optimizing-spatial-queries/benchmark.sql"
+    echo "  ./benchmark.sh pages/some-other/script.py --args"
     exit 1
 fi
 
@@ -43,4 +43,8 @@ fi
 echo "Running: $CONTAINER_PATH $*"
 echo ""
 
-docker compose exec -t server python "$CONTAINER_PATH" "$@"
+if [[ "$SCRIPT_PATH" == *.sql ]]; then
+    docker compose exec -T db psql -U postgres -d overturemaps < "$SCRIPT_PATH"
+else
+    docker compose exec -t server python "$CONTAINER_PATH" "$@"
+fi
