@@ -52,24 +52,6 @@ QUERIES = {
 OUTPUT = Path(__file__).parent / "benchmark_results.md"
 
 
-def timed(cursor, sql):
-    """Execute SQL and return (result, elapsed_seconds)."""
-    start = time.time()
-    cursor.execute(sql)
-    return cursor.fetchall(), time.time() - start
-
-
-def parse_exec_time(plan):
-    """Extract execution time from EXPLAIN output."""
-    for line in plan:
-        if "Execution Time:" in line[0]:
-            try:
-                return float(line[0].split(":")[1].strip().replace(" ms", ""))
-            except:
-                pass
-    return None
-
-
 def main():
     print(f"Divisions: {DIVISIONS}")
     print(f"Queries: {list(QUERIES.keys())}\n")
@@ -78,30 +60,26 @@ def main():
 
     for osm_id in DIVISIONS:
         for name, query in QUERIES.items():
-            print(f"{name} on {osm_id}...")
+            print(f"{name} on {osm_id}...", flush=True)
 
             conn = psycopg2.connect(**DB)
             cur = conn.cursor()
 
             sql = query.format(osm_id=osm_id)
 
-            # EXPLAIN ANALYZE
-            plan, t1 = timed(cur, f"EXPLAIN (ANALYZE, BUFFERS) {sql}")
-            exec_ms = parse_exec_time(plan)
-            print(f"  explain: {exec_ms/1000:.1f}s (wall: {t1:.1f}s)")
+            # Just COUNT with timing
+            start = time.time()
+            cur.execute(f"SELECT COUNT(*) FROM ({sql}) q")
+            count = cur.fetchone()[0]
+            elapsed = time.time() - start
 
-            # COUNT
-            rows, t2 = timed(cur, f"SELECT COUNT(*) FROM ({sql}) q")
-            count = rows[0][0]
-            print(f"  count:   {count:,} (wall: {t2:.1f}s)\n")
+            print(f"  {count:,} rows in {elapsed:.1f}s\n", flush=True)
 
             results.append({
                 "osm_id": osm_id,
                 "name": name,
-                "exec_ms": exec_ms,
+                "time_s": elapsed,
                 "count": count,
-                "count_time": t2,
-                "plan": "\n".join(r[0] for r in plan),
             })
 
             cur.close()
@@ -110,15 +88,10 @@ def main():
     # Write results
     with open(OUTPUT, "w") as f:
         f.write(f"# Benchmark Results\n\nGenerated: {datetime.now().isoformat()}\n\n")
-        f.write("## Summary\n\n")
         f.write("| Division | Query | Time | Count |\n")
         f.write("|----------|-------|------|-------|\n")
         for r in results:
-            t = f"{r['exec_ms']/1000:.1f}s" if r['exec_ms'] else "N/A"
-            f.write(f"| {r['osm_id']} | {r['name']} | {t} | {r['count']:,} |\n")
-        f.write("\n## Details\n")
-        for r in results:
-            f.write(f"\n### {r['osm_id']} - {r['name']}\n\n```\n{r['plan']}\n```\n")
+            f.write(f"| {r['osm_id']} | {r['name']} | {r['time_s']:.1f}s | {r['count']:,} |\n")
 
     print(f"Results: {OUTPUT}")
 
