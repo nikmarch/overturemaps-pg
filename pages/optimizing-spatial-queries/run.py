@@ -1,22 +1,16 @@
 #!/usr/bin/env python3
 """
 Benchmark spatial queries. Runs all query variants against all divisions.
-
-Usage:
-    python run.py
-    python run.py --restart
 """
 
-import argparse
 import os
-import subprocess
 import time
 from datetime import datetime
 from pathlib import Path
 
 import psycopg2
 
-DB_CONFIG = {
+DB = {
     "host": os.environ.get("PGHOST", "localhost"),
     "port": os.environ.get("PGPORT", "5432"),
     "database": os.environ.get("PGDATABASE", "overturemaps"),
@@ -27,172 +21,106 @@ DB_CONFIG = {
 DIVISIONS = ["r51477", "r167454", "r60189"]
 
 QUERIES = {
-    "join": {
-        "explain": """
-            EXPLAIN (ANALYZE, BUFFERS)
-            SELECT p.id::text, p.name, p.geography as geom
-            FROM places p
-            JOIN divisions d ON ST_Covers(d.geography, p.geography)
-            WHERE d.osm_id = '{osm_id}';
-        """,
-        "count": """
-            SELECT COUNT(*)
-            FROM places p
-            JOIN divisions d ON ST_Covers(d.geography, p.geography)
-            WHERE d.osm_id = '{osm_id}';
-        """,
-    },
-    "cte": {
-        "explain": """
-            EXPLAIN (ANALYZE, BUFFERS)
-            WITH div AS MATERIALIZED (
-                SELECT geography as geog
-                FROM divisions
-                WHERE osm_id = '{osm_id}'
-            )
-            SELECT p.id::text, p.name, p.geography as geom
-            FROM places p, div
-            WHERE ST_Covers(div.geog, p.geography);
-        """,
-        "count": """
-            WITH div AS MATERIALIZED (
-                SELECT geography as geog
-                FROM divisions
-                WHERE osm_id = '{osm_id}'
-            )
-            SELECT COUNT(*)
-            FROM places p, div
-            WHERE ST_Covers(div.geog, p.geography);
-        """,
-    },
-    "cte_simplified": {
-        "explain": """
-            EXPLAIN (ANALYZE, BUFFERS)
-            WITH div AS MATERIALIZED (
-                SELECT ST_Simplify(ST_Buffer(geography::geometry, 0.01), 0.01)::geography as geog
-                FROM divisions
-                WHERE osm_id = '{osm_id}'
-            )
-            SELECT p.id::text, p.name, p.geography as geom
-            FROM places p, div
-            WHERE ST_Covers(div.geog, p.geography);
-        """,
-        "count": """
-            WITH div AS MATERIALIZED (
-                SELECT ST_Simplify(ST_Buffer(geography::geometry, 0.01), 0.01)::geography as geog
-                FROM divisions
-                WHERE osm_id = '{osm_id}'
-            )
-            SELECT COUNT(*)
-            FROM places p, div
-            WHERE ST_Covers(div.geog, p.geography);
-        """,
-    },
+    "join": """
+        SELECT p.id::text, p.name, p.geography as geom
+        FROM places p
+        JOIN divisions d ON ST_Covers(d.geography, p.geography)
+        WHERE d.osm_id = '{osm_id}'
+    """,
+    "cte": """
+        WITH div AS MATERIALIZED (
+            SELECT geography as geog
+            FROM divisions
+            WHERE osm_id = '{osm_id}'
+        )
+        SELECT p.id::text, p.name, p.geography as geom
+        FROM places p, div
+        WHERE ST_Covers(div.geog, p.geography)
+    """,
+    "cte_simplified": """
+        WITH div AS MATERIALIZED (
+            SELECT ST_Buffer(ST_Simplify(geography::geometry, 1000 / 111342.0), 1000 / 111342.0)::geography as geog
+            FROM divisions
+            WHERE osm_id = '{osm_id}'
+        )
+        SELECT p.id::text, p.name, p.geography as geom
+        FROM places p, div
+        WHERE ST_Covers(div.geog, p.geography)
+    """,
 }
 
-OUTPUT_FILE = Path(__file__).parent / "benchmark_results.md"
+OUTPUT = Path(__file__).parent / "benchmark_results.md"
 
 
-def restart_postgres():
-    print("  Restarting PostgreSQL...")
-    subprocess.run(["docker", "compose", "restart", "db"], cwd="/app", capture_output=True)
-    for _ in range(30):
-        try:
-            psycopg2.connect(**DB_CONFIG).close()
-            return
-        except psycopg2.OperationalError:
-            time.sleep(2)
-
-
-def run_explain(cursor, query):
-    """Run EXPLAIN query, return (exec_time_ms, plan)."""
+def timed(cursor, sql):
+    """Execute SQL and return (result, elapsed_seconds)."""
     start = time.time()
-    cursor.execute(query)
-    elapsed = time.time() - start
-    plan = "\n".join(row[0] for row in cursor.fetchall())
+    cursor.execute(sql)
+    return cursor.fetchall(), time.time() - start
 
-    exec_time = None
-    for line in plan.split("\n"):
-        if "Execution Time:" in line:
+
+def parse_exec_time(plan):
+    """Extract execution time from EXPLAIN output."""
+    for line in plan:
+        if "Execution Time:" in line[0]:
             try:
-                exec_time = float(line.split(":")[1].strip().replace(" ms", ""))
+                return float(line[0].split(":")[1].strip().replace(" ms", ""))
             except:
                 pass
-    return exec_time, elapsed, plan
-
-
-def run_count(cursor, query):
-    """Run COUNT query, return (count, elapsed_seconds)."""
-    start = time.time()
-    cursor.execute(query)
-    count = cursor.fetchone()[0]
-    elapsed = time.time() - start
-    return count, elapsed
+    return None
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--restart", action="store_true")
-    args = parser.parse_args()
-
     print(f"Divisions: {DIVISIONS}")
-    print(f"Queries: {list(QUERIES.keys())}")
-    print(f"Restart: {args.restart}\n")
+    print(f"Queries: {list(QUERIES.keys())}\n")
 
     results = []
 
     for osm_id in DIVISIONS:
-        for query_name, query_data in QUERIES.items():
-            print(f"Running {query_name} on {osm_id}...")
+        for name, query in QUERIES.items():
+            print(f"{name} on {osm_id}...")
 
-            if args.restart:
-                restart_postgres()
+            conn = psycopg2.connect(**DB)
+            cur = conn.cursor()
 
-            conn = psycopg2.connect(**DB_CONFIG)
-            cursor = conn.cursor()
+            sql = query.format(osm_id=osm_id)
 
-            # Run EXPLAIN
-            explain_query = query_data["explain"].format(osm_id=osm_id)
-            exec_time, explain_elapsed, plan = run_explain(cursor, explain_query)
-            print(f"  EXPLAIN: {exec_time/1000:.1f}s (wall: {explain_elapsed:.1f}s)")
+            # EXPLAIN ANALYZE
+            plan, t1 = timed(cur, f"EXPLAIN (ANALYZE, BUFFERS) {sql}")
+            exec_ms = parse_exec_time(plan)
+            print(f"  explain: {exec_ms/1000:.1f}s (wall: {t1:.1f}s)")
 
-            # Run COUNT
-            count_query = query_data["count"].format(osm_id=osm_id)
-            count, count_elapsed = run_count(cursor, count_query)
-            print(f"  COUNT:   {count:,} rows (wall: {count_elapsed:.1f}s)\n")
+            # COUNT
+            rows, t2 = timed(cur, f"SELECT COUNT(*) FROM ({sql}) q")
+            count = rows[0][0]
+            print(f"  count:   {count:,} (wall: {t2:.1f}s)\n")
 
             results.append({
                 "osm_id": osm_id,
-                "query": query_name,
-                "exec_time_ms": exec_time,
-                "explain_elapsed": explain_elapsed,
+                "name": name,
+                "exec_ms": exec_ms,
                 "count": count,
-                "count_elapsed": count_elapsed,
-                "plan": plan,
+                "count_time": t2,
+                "plan": "\n".join(r[0] for r in plan),
             })
 
-            cursor.close()
+            cur.close()
             conn.close()
 
     # Write results
-    with open(OUTPUT_FILE, "w") as f:
+    with open(OUTPUT, "w") as f:
         f.write(f"# Benchmark Results\n\nGenerated: {datetime.now().isoformat()}\n\n")
         f.write("## Summary\n\n")
-        f.write("| Division | Query | Exec Time | Count | Count Time |\n")
-        f.write("|----------|-------|-----------|-------|------------|\n")
+        f.write("| Division | Query | Time | Count |\n")
+        f.write("|----------|-------|------|-------|\n")
         for r in results:
-            t = f"{r['exec_time_ms']/1000:.1f}s" if r['exec_time_ms'] else "N/A"
-            ct = f"{r['count_elapsed']:.1f}s"
-            f.write(f"| {r['osm_id']} | {r['query']} | {t} | {r['count']:,} | {ct} |\n")
+            t = f"{r['exec_ms']/1000:.1f}s" if r['exec_ms'] else "N/A"
+            f.write(f"| {r['osm_id']} | {r['name']} | {t} | {r['count']:,} |\n")
         f.write("\n## Details\n")
         for r in results:
-            f.write(f"\n### {r['osm_id']} - {r['query']}\n\n")
-            f.write(f"- **Exec time**: {r['exec_time_ms']/1000:.1f}s\n" if r['exec_time_ms'] else "")
-            f.write(f"- **Row count**: {r['count']:,}\n")
-            f.write(f"- **Count time**: {r['count_elapsed']:.1f}s\n")
-            f.write(f"\n```\n{r['plan']}\n```\n")
+            f.write(f"\n### {r['osm_id']} - {r['name']}\n\n```\n{r['plan']}\n```\n")
 
-    print(f"Results: {OUTPUT_FILE}")
+    print(f"Results: {OUTPUT}")
 
 
 if __name__ == "__main__":
