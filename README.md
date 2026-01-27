@@ -44,7 +44,7 @@ Connection: `postgres://postgres:postgres@localhost:5432/overturemaps`
 | Table | Columns | Source |
 |-------|---------|--------|
 | `places` | id, geography, name | [places](https://docs.overturemaps.org/guides/places/) |
-| `divisions` | id, geography, osm_id | [divisions](https://docs.overturemaps.org/guides/divisions/) |
+| `divisions` | id, geography, osm_id, name | [divisions](https://docs.overturemaps.org/guides/divisions/) |
 
 Both tables use `geography` type (accurate distance/area in meters) with GIST indexes.
 
