@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 """
-Benchmark script for spatial query optimization article.
-Compares slow vs fast (simplified polygon) queries across multiple divisions.
+Benchmark spatial queries. Runs all query variants against all divisions.
 
 Usage:
-    python run.py                           # Default divisions
-    python run.py --restart                 # Restart PostgreSQL between queries
-    python run.py --divisions r51477,r167454
+    python run.py
+    python run.py --restart
 """
 
 import argparse
@@ -18,7 +16,6 @@ from pathlib import Path
 
 import psycopg2
 
-# Database connection from environment
 DB_CONFIG = {
     "host": os.environ.get("PGHOST", "localhost"),
     "port": os.environ.get("PGPORT", "5432"),
@@ -27,235 +24,175 @@ DB_CONFIG = {
     "password": os.environ.get("PGPASSWORD", "postgres"),
 }
 
-# Default divisions to test
-DEFAULT_DIVISIONS = ["r51477", "r167454", "r60189"]
+DIVISIONS = ["r51477", "r167454", "r60189"]
 
-# Queries
-QUERY_SLOW = """
-EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT)
-SELECT p.id::text, p.name, p.geography as geom
-FROM places p
-JOIN divisions d ON ST_Covers(d.geography, p.geography)
-WHERE d.osm_id = %s;
-"""
+QUERIES = {
+    "join": {
+        "explain": """
+            EXPLAIN (ANALYZE, BUFFERS)
+            SELECT p.id::text, p.name, p.geography as geom
+            FROM places p
+            JOIN divisions d ON ST_Covers(d.geography, p.geography)
+            WHERE d.osm_id = '{osm_id}';
+        """,
+        "count": """
+            SELECT COUNT(*)
+            FROM places p
+            JOIN divisions d ON ST_Covers(d.geography, p.geography)
+            WHERE d.osm_id = '{osm_id}';
+        """,
+    },
+    "cte": {
+        "explain": """
+            EXPLAIN (ANALYZE, BUFFERS)
+            WITH div AS MATERIALIZED (
+                SELECT geography as geog
+                FROM divisions
+                WHERE osm_id = '{osm_id}'
+            )
+            SELECT p.id::text, p.name, p.geography as geom
+            FROM places p, div
+            WHERE ST_Covers(div.geog, p.geography);
+        """,
+        "count": """
+            WITH div AS MATERIALIZED (
+                SELECT geography as geog
+                FROM divisions
+                WHERE osm_id = '{osm_id}'
+            )
+            SELECT COUNT(*)
+            FROM places p, div
+            WHERE ST_Covers(div.geog, p.geography);
+        """,
+    },
+    "cte_simplified": {
+        "explain": """
+            EXPLAIN (ANALYZE, BUFFERS)
+            WITH div AS MATERIALIZED (
+                SELECT ST_Simplify(ST_Buffer(geography::geometry, 0.01), 0.01)::geography as geog
+                FROM divisions
+                WHERE osm_id = '{osm_id}'
+            )
+            SELECT p.id::text, p.name, p.geography as geom
+            FROM places p, div
+            WHERE ST_Covers(div.geog, p.geography);
+        """,
+        "count": """
+            WITH div AS MATERIALIZED (
+                SELECT ST_Simplify(ST_Buffer(geography::geometry, 0.01), 0.01)::geography as geog
+                FROM divisions
+                WHERE osm_id = '{osm_id}'
+            )
+            SELECT COUNT(*)
+            FROM places p, div
+            WHERE ST_Covers(div.geog, p.geography);
+        """,
+    },
+}
 
-QUERY_FAST = """
-EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT)
-WITH div AS MATERIALIZED (
-    SELECT ST_Simplify(ST_Buffer(geography::geometry, 0.01), 0.01)::geography as geog
-    FROM divisions
-    WHERE osm_id = %s
-)
-SELECT p.id::text, p.name, p.geography as geom
-FROM places p, div
-WHERE ST_Covers(div.geog, p.geography);
-"""
+OUTPUT_FILE = Path(__file__).parent / "benchmark_results.md"
 
 
 def restart_postgres():
-    """Restart PostgreSQL by restarting the db container."""
-    print("    Restarting PostgreSQL...")
-    subprocess.run(
-        ["docker", "compose", "restart", "db"],
-        cwd="/app",
-        capture_output=True,
-        check=True,
-    )
-    # Wait for PostgreSQL to be ready
+    print("  Restarting PostgreSQL...")
+    subprocess.run(["docker", "compose", "restart", "db"], cwd="/app", capture_output=True)
     for _ in range(30):
         try:
-            conn = psycopg2.connect(**DB_CONFIG)
-            conn.close()
-            print("    PostgreSQL is ready")
+            psycopg2.connect(**DB_CONFIG).close()
             return
         except psycopg2.OperationalError:
             time.sleep(2)
-    raise Exception("PostgreSQL did not become ready")
 
 
-def get_division_info(cursor, osm_id):
-    """Get division name and vertex count."""
-    cursor.execute(
-        """
-        SELECT name, ST_NPoints(geography::geometry) as vertices
-        FROM divisions
-        WHERE osm_id = %s
-        LIMIT 1
-        """,
-        (osm_id,),
-    )
-    row = cursor.fetchone()
-    if row:
-        return {"name": row[0] or osm_id, "vertices": row[1]}
-    return {"name": osm_id, "vertices": 0}
+def run_explain(cursor, query):
+    """Run EXPLAIN query, return (exec_time_ms, plan)."""
+    start = time.time()
+    cursor.execute(query)
+    elapsed = time.time() - start
+    plan = "\n".join(row[0] for row in cursor.fetchall())
 
-
-def run_query(cursor, query, osm_id):
-    """Run EXPLAIN ANALYZE query and extract results."""
-    cursor.execute(query, (osm_id,))
-    rows = cursor.fetchall()
-    plan = "\n".join(row[0] for row in rows)
-
-    # Extract execution time
-    exec_time_ms = None
+    exec_time = None
     for line in plan.split("\n"):
         if "Execution Time:" in line:
             try:
-                exec_time_ms = float(line.split(":")[1].strip().replace(" ms", ""))
-            except (ValueError, IndexError):
+                exec_time = float(line.split(":")[1].strip().replace(" ms", ""))
+            except:
                 pass
+    return exec_time, elapsed, plan
 
-    return {"plan": plan, "time_ms": exec_time_ms}
 
-
-def format_time(ms):
-    """Format milliseconds nicely."""
-    if ms is None:
-        return "N/A"
-    if ms < 1000:
-        return f"{ms:.0f}ms"
-    if ms < 60000:
-        return f"{ms/1000:.1f}s"
-    minutes = int(ms // 60000)
-    seconds = (ms % 60000) / 1000
-    return f"{minutes}m {seconds:.0f}s"
+def run_count(cursor, query):
+    """Run COUNT query, return (count, elapsed_seconds)."""
+    start = time.time()
+    cursor.execute(query)
+    count = cursor.fetchone()[0]
+    elapsed = time.time() - start
+    return count, elapsed
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Benchmark spatial queries")
-    parser.add_argument(
-        "--restart",
-        action="store_true",
-        help="Restart PostgreSQL between queries for cold cache",
-    )
-    parser.add_argument(
-        "--divisions",
-        type=str,
-        help="Comma-separated osm_ids (default: r51477,r167454,r102740)",
-    )
-    parser.add_argument(
-        "--output",
-        type=str,
-        default=str(Path(__file__).parent / "benchmark_results.md"),
-        help="Output file path",
-    )
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--restart", action="store_true")
     args = parser.parse_args()
 
-    divisions = (
-        args.divisions.split(",") if args.divisions else DEFAULT_DIVISIONS
-    )
-
-    print("=" * 60)
-    print("Spatial Query Benchmark")
-    print("=" * 60)
-    print(f"Divisions: {', '.join(divisions)}")
-    print(f"Restart between queries: {args.restart}")
-    print(f"Output: {args.output}")
+    print(f"Divisions: {DIVISIONS}")
+    print(f"Queries: {list(QUERIES.keys())}")
+    print(f"Restart: {args.restart}\n")
 
     results = []
 
-    for osm_id in divisions:
-        print(f"\n{'='*60}")
-        print(f"Benchmarking: {osm_id}")
-        print("=" * 60)
+    for osm_id in DIVISIONS:
+        for query_name, query_data in QUERIES.items():
+            print(f"Running {query_name} on {osm_id}...")
 
-        conn = psycopg2.connect(**DB_CONFIG)
-        cursor = conn.cursor()
+            if args.restart:
+                restart_postgres()
 
-        # Get division info
-        info = get_division_info(cursor, osm_id)
-        print(f"  Division: {info['name']}")
-        print(f"  Vertices: {info['vertices']:,}")
-
-        result = {
-            "osm_id": osm_id,
-            "name": info["name"],
-            "vertices": info["vertices"],
-        }
-
-        # Run slow query
-        if args.restart:
-            cursor.close()
-            conn.close()
-            restart_postgres()
             conn = psycopg2.connect(**DB_CONFIG)
             cursor = conn.cursor()
 
-        print("\n  Running SLOW query...")
-        slow = run_query(cursor, QUERY_SLOW, osm_id)
-        result["slow_time_ms"] = slow["time_ms"]
-        result["slow_plan"] = slow["plan"]
-        print(f"  Time: {format_time(slow['time_ms'])}")
+            # Run EXPLAIN
+            explain_query = query_data["explain"].format(osm_id=osm_id)
+            exec_time, explain_elapsed, plan = run_explain(cursor, explain_query)
+            print(f"  EXPLAIN: {exec_time/1000:.1f}s (wall: {explain_elapsed:.1f}s)")
 
-        # Run fast query
-        if args.restart:
+            # Run COUNT
+            count_query = query_data["count"].format(osm_id=osm_id)
+            count, count_elapsed = run_count(cursor, count_query)
+            print(f"  COUNT:   {count:,} rows (wall: {count_elapsed:.1f}s)\n")
+
+            results.append({
+                "osm_id": osm_id,
+                "query": query_name,
+                "exec_time_ms": exec_time,
+                "explain_elapsed": explain_elapsed,
+                "count": count,
+                "count_elapsed": count_elapsed,
+                "plan": plan,
+            })
+
             cursor.close()
             conn.close()
-            restart_postgres()
-            conn = psycopg2.connect(**DB_CONFIG)
-            cursor = conn.cursor()
-
-        print("\n  Running FAST query...")
-        fast = run_query(cursor, QUERY_FAST, osm_id)
-        result["fast_time_ms"] = fast["time_ms"]
-        result["fast_plan"] = fast["plan"]
-        print(f"  Time: {format_time(fast['time_ms'])}")
-
-        # Calculate improvement
-        if slow["time_ms"] and fast["time_ms"] and fast["time_ms"] > 0:
-            result["improvement"] = slow["time_ms"] / fast["time_ms"]
-            print(f"\n  Improvement: {result['improvement']:.1f}x faster")
-
-        results.append(result)
-        cursor.close()
-        conn.close()
 
     # Write results
-    write_results(results, args.output)
-
-    print(f"\n{'='*60}")
-    print("Benchmark complete!")
-    print(f"Results: {args.output}")
-    print("=" * 60)
-
-
-def write_results(results, output_path):
-    """Write results to markdown file."""
-    with open(output_path, "w") as f:
-        f.write("# Spatial Query Benchmark Results\n\n")
-        f.write(f"Generated: {datetime.now().isoformat()}\n\n")
-
-        # Summary table
+    with open(OUTPUT_FILE, "w") as f:
+        f.write(f"# Benchmark Results\n\nGenerated: {datetime.now().isoformat()}\n\n")
         f.write("## Summary\n\n")
-        f.write("| Division | Vertices | Slow | Fast | Improvement |\n")
-        f.write("|----------|----------|------|------|-------------|\n")
-
+        f.write("| Division | Query | Exec Time | Count | Count Time |\n")
+        f.write("|----------|-------|-----------|-------|------------|\n")
         for r in results:
-            slow = format_time(r.get("slow_time_ms"))
-            fast = format_time(r.get("fast_time_ms"))
-            improvement = f"{r.get('improvement', 0):.1f}x" if r.get("improvement") else "N/A"
-            f.write(f"| {r['name']} | {r['vertices']:,} | {slow} | {fast} | {improvement} |\n")
-
-        # Detailed results
-        f.write("\n## Detailed Results\n")
-
+            t = f"{r['exec_time_ms']/1000:.1f}s" if r['exec_time_ms'] else "N/A"
+            ct = f"{r['count_elapsed']:.1f}s"
+            f.write(f"| {r['osm_id']} | {r['query']} | {t} | {r['count']:,} | {ct} |\n")
+        f.write("\n## Details\n")
         for r in results:
-            f.write(f"\n### {r['name']} ({r['osm_id']})\n\n")
-            f.write(f"- **Vertices**: {r['vertices']:,}\n")
-            f.write(f"- **Slow query**: {format_time(r.get('slow_time_ms'))}\n")
-            f.write(f"- **Fast query**: {format_time(r.get('fast_time_ms'))}\n")
-            if r.get("improvement"):
-                f.write(f"- **Improvement**: {r['improvement']:.1f}x\n")
+            f.write(f"\n### {r['osm_id']} - {r['query']}\n\n")
+            f.write(f"- **Exec time**: {r['exec_time_ms']/1000:.1f}s\n" if r['exec_time_ms'] else "")
+            f.write(f"- **Row count**: {r['count']:,}\n")
+            f.write(f"- **Count time**: {r['count_elapsed']:.1f}s\n")
+            f.write(f"\n```\n{r['plan']}\n```\n")
 
-            f.write("\n#### Slow Query EXPLAIN\n\n```\n")
-            f.write(r.get("slow_plan", "N/A"))
-            f.write("\n```\n")
-
-            f.write("\n#### Fast Query EXPLAIN\n\n```\n")
-            f.write(r.get("fast_plan", "N/A"))
-            f.write("\n```\n")
-
-    print(f"\nResults written to: {output_path}")
+    print(f"Results: {OUTPUT_FILE}")
 
 
 if __name__ == "__main__":
