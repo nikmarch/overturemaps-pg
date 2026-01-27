@@ -28,7 +28,7 @@ DB_CONFIG = {
 }
 
 # Default divisions to test
-DEFAULT_DIVISIONS = ["r51477", "r167454", "r102740"]
+DEFAULT_DIVISIONS = ["r51477", "r167454", "r60189"]
 
 # Queries
 QUERY_SLOW = """

@@ -21,7 +21,7 @@ From the repo root:
 
 - `r51477` - Deutschland (159k vertices)
 - `r167454` - Chile (207k vertices)
-- `r102740` - Bretagne (255k vertices)
+- `r60189` - Russia (209k vertices)
 
 ## Output
 
