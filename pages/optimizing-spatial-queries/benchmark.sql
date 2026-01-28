@@ -1,20 +1,3 @@
--- Ensure indexes exist
-CREATE INDEX IF NOT EXISTS places_geometry_idx ON places USING GIST (geometry);
-CREATE INDEX IF NOT EXISTS divisions_geometry_idx ON divisions USING GIST (geometry);
-CREATE INDEX IF NOT EXISTS divisions_id_idx ON divisions (id);
-
--- Update statistics for query planner
-ANALYZE places;
-ANALYZE divisions;
-
--- Performance tuning (session-level)
-SET work_mem = '1GB';
-SET effective_cache_size = '12GB';
-SET max_parallel_workers_per_gather = 4;
-SET random_page_cost = 1.1;  -- for SSD
-SET parallel_tuple_cost = 0.001;  -- encourage parallelism
-SET parallel_setup_cost = 100;    -- lower barrier for parallel plans
-
 \timing on
 
 -- Argentina
