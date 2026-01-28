@@ -29,6 +29,16 @@ if [ ! -f "$SCRIPT_PATH" ]; then
     exit 1
 fi
 
+# Create results directory next to the script
+SCRIPT_DIR=$(dirname "$SCRIPT_PATH")
+RESULTS_DIR="${SCRIPT_DIR}/results"
+mkdir -p "$RESULTS_DIR"
+
+# Generate log filename with timestamp
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+SCRIPT_NAME=$(basename "$SCRIPT_PATH" | sed 's/\.[^.]*$//')
+LOG_FILE="${RESULTS_DIR}/${SCRIPT_NAME}_${TIMESTAMP}.log"
+
 # Check if containers are running
 if ! docker compose ps --status running | grep -q "server"; then
     echo "Container not running. Starting..."
@@ -41,10 +51,14 @@ if ! docker compose ps --status running | grep -q "server"; then
 fi
 
 echo "Running: $CONTAINER_PATH $*"
+echo "Logging to: $LOG_FILE"
 echo ""
 
 if [[ "$SCRIPT_PATH" == *.sql ]]; then
-    docker compose exec -T db psql -U postgres -d overturemaps < "$SCRIPT_PATH"
+    docker compose exec -T db psql -U postgres -d overturemaps < "$SCRIPT_PATH" 2>&1 | tee "$LOG_FILE"
 else
-    docker compose exec -t server python "$CONTAINER_PATH" "$@"
+    docker compose exec -t server python "$CONTAINER_PATH" "$@" 2>&1 | tee "$LOG_FILE"
 fi
+
+echo ""
+echo "Results saved to: $LOG_FILE"
