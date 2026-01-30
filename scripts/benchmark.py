@@ -1,131 +1,126 @@
 #!/usr/bin/env python3
 """
-Benchmark runner for spatial queries.
-Parses SQL file with labeled queries, restarts PostgreSQL between runs for cold cache.
+Benchmark runner - runs inside Docker container.
+Executes SQL queries from a folder with timing.
 
 Usage:
-    python scripts/benchmark.py pages/optimizing-spatial-queries/benchmark.sql
+    python benchmark.py <folder> --list
+        List all queries in the folder
+
+    python benchmark.py <folder> --query <name> --config '{"id": "..."}'
+        Run a specific query with config object for substitution
+
+    python benchmark.py <folder> --config-items
+        List config items from _config.json
 """
 
-import subprocess
+import argparse
+import json
+import os
+import re
 import sys
 import time
-import re
-from datetime import datetime
 from pathlib import Path
 
-
-# Test divisions: (name, id)
-DIVISIONS = [
-    ("Argentina", "6aaadea0-9c48-4af0-a47f-bbe020540580"),
-    ("Deutschland", "d95d3f8a-a2f4-4436-b0e4-a3a86d15008e"),
-    ("United States", "50a03a2c-3e24-4740-b80d-f933ea60c64f"),
-]
+import psycopg2
 
 
-def parse_sql_file(path: Path) -> list[dict]:
-    """Parse SQL file into labeled queries."""
-    content = path.read_text()
+DB_CONFIG = {
+    "host": os.environ.get("PGHOST", "db"),
+    "port": os.environ.get("PGPORT", "5432"),
+    "user": os.environ.get("PGUSER", "postgres"),
+    "password": os.environ.get("PGPASSWORD", "postgres"),
+    "dbname": os.environ.get("PGDATABASE", "overturemaps"),
+}
+
+
+def get_connection():
+    return psycopg2.connect(**DB_CONFIG)
+
+
+def load_config(folder: Path) -> list:
+    """Load _config.json from folder (array of objects)."""
+    config_file = folder / "_config.json"
+    if config_file.exists():
+        return json.loads(config_file.read_text())
+    return []
+
+
+def list_queries(folder: Path) -> list[dict]:
+    """List all .sql files in folder with their metadata."""
     queries = []
+    for sql_file in sorted(folder.glob("*.sql")):
+        content = sql_file.read_text()
 
-    # Split by @query markers
-    parts = re.split(r'--\s*@query\s+(\w+)\s*\n', content)
-
-    # parts[0] is header, then alternating: name, sql, name, sql...
-    for i in range(1, len(parts), 2):
-        name = parts[i]
-        sql = parts[i + 1].strip() if i + 1 < len(parts) else ""
-
-        # Extract description (first comment line after @query)
-        desc_match = re.match(r'--\s*(.+?)\n', sql)
+        # Extract description from first comment line
+        desc_match = re.match(r'^--\s*(.+)', content)
         description = desc_match.group(1) if desc_match else ""
 
-        # Remove leading comment lines from SQL
-        sql = re.sub(r'^--.*\n', '', sql).strip()
-
-        if sql:
-            queries.append({
-                "name": name,
-                "description": description,
-                "sql": sql,
-            })
-
+        queries.append({
+            "name": sql_file.stem,
+            "file": str(sql_file),
+            "description": description,
+        })
     return queries
 
 
-def restart_db() -> bool:
-    """Restart PostgreSQL container and wait for ready."""
-    print("    Restarting database...", end=" ", flush=True)
+def run_query(folder: Path, query_name: str, config: dict) -> dict:
+    """Run a query and return timing results."""
+    sql_file = folder / f"{query_name}.sql"
+    if not sql_file.exists():
+        return {"error": f"Query file not found: {sql_file}"}
 
-    subprocess.run(
-        ["docker", "compose", "restart", "db"],
-        capture_output=True,
-        check=True,
-    )
+    # Read SQL
+    sql = sql_file.read_text()
 
-    # Wait for ready
-    for _ in range(30):
-        result = subprocess.run(
-            ["docker", "compose", "exec", "-T", "db", "pg_isready", "-U", "postgres"],
-            capture_output=True,
-        )
-        if result.returncode == 0:
-            print("ready")
-            time.sleep(2)  # Extra stability wait
-            return True
-        time.sleep(1)
+    # Extract description
+    desc_match = re.match(r'^--\s*(.+)', sql)
+    description = desc_match.group(1) if desc_match else ""
 
-    print("FAILED")
-    return False
+    # Substitute all {key} placeholders from config
+    for key, value in config.items():
+        sql = sql.replace(f"{{{key}}}", str(value))
 
+    # Remove comment lines for cleaner execution
+    sql_clean = "\n".join(
+        line for line in sql.split("\n")
+        if not line.strip().startswith("--")
+    ).strip()
 
-def run_query(sql: str) -> dict:
-    """Run a query and return timing and count."""
-    timed_sql = f"\\timing on\n{sql}"
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
 
-    result = subprocess.run(
-        ["docker", "compose", "exec", "-T", "db", "psql", "-U", "postgres", "-d", "overturemaps"],
-        input=timed_sql,
-        capture_output=True,
-        text=True,
-    )
+        # Run with timing
+        start = time.perf_counter()
+        cur.execute(sql_clean)
+        row = cur.fetchone()
+        elapsed_ms = (time.perf_counter() - start) * 1000
 
-    output = result.stdout + result.stderr
+        count = row[0] if row else None
 
-    # Parse count
-    count = None
-    for line in output.split("\n"):
-        line = line.strip()
-        if line.isdigit():
-            count = int(line)
-            break
+        # Run EXPLAIN ANALYZE
+        explain_sql = sql_clean.replace("COUNT(*)", "*")
+        cur.execute(f"EXPLAIN ANALYZE {explain_sql}")
+        explain_rows = cur.fetchall()
+        explain = "\n".join(row[0] for row in explain_rows)
 
-    # Parse time (e.g., "Time: 1234.567 ms")
-    time_ms = None
-    time_match = re.search(r'Time:\s+([\d.]+)\s*ms', output)
-    if time_match:
-        time_ms = float(time_match.group(1))
+        conn.close()
 
-    return {"count": count, "time_ms": time_ms, "output": output}
+        return {
+            "query": query_name,
+            "description": description,
+            "config": config,
+            "count": count,
+            "time_ms": round(elapsed_ms, 2),
+            "explain": explain,
+        }
 
-
-def run_explain(sql: str) -> str:
-    """Run EXPLAIN ANALYZE on a query."""
-    # Convert COUNT(*) to * for EXPLAIN
-    explain_sql = sql.replace("COUNT(*)", "*")
-    explain_sql = f"EXPLAIN ANALYZE\n{explain_sql}"
-
-    result = subprocess.run(
-        ["docker", "compose", "exec", "-T", "db", "psql", "-U", "postgres", "-d", "overturemaps"],
-        input=explain_sql,
-        capture_output=True,
-        text=True,
-    )
-
-    return result.stdout
+    except Exception as e:
+        return {"error": str(e)}
 
 
-def format_time(ms: float | None) -> str:
+def format_time(ms) -> str:
     """Format milliseconds as human-readable."""
     if ms is None:
         return "N/A"
@@ -140,117 +135,34 @@ def format_time(ms: float | None) -> str:
 
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python scripts/benchmark.py <sql-file>")
-        print("Example: python scripts/benchmark.py pages/optimizing-spatial-queries/benchmark.sql")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description="Benchmark SQL queries")
+    parser.add_argument("folder", help="Folder containing .sql files")
+    parser.add_argument("--list", action="store_true", help="List available queries")
+    parser.add_argument("--config-items", action="store_true", help="List items from _config.json")
+    parser.add_argument("--query", "-q", help="Query name to run")
+    parser.add_argument("--config", "-c", help="Config object as JSON string")
 
-    sql_path = Path(sys.argv[1])
-    if not sql_path.exists():
-        print(f"Error: File not found: {sql_path}")
-        sys.exit(1)
+    args = parser.parse_args()
+    folder = Path(args.folder)
 
-    # Parse queries
-    queries = parse_sql_file(sql_path)
-    print(f"Found {len(queries)} queries: {[q['name'] for q in queries]}")
-    print()
-
-    # Setup results directory
-    results_dir = sql_path.parent / "results"
-    results_dir.mkdir(exist_ok=True)
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    result_file = results_dir / f"benchmark_{timestamp}.md"
-
-    # Collect results
-    all_results = []
-
-    for div_name, div_id in DIVISIONS:
-        print(f"=== {div_name} ===")
-        div_results = {"name": div_name, "id": div_id, "queries": {}}
-
-        for query in queries:
-            print(f"  Running {query['name']}...")
-
-            # Restart for cold cache
-            if not restart_db():
-                sys.exit(1)
-
-            # Substitute division_id
-            sql = query["sql"].replace("{division_id}", div_id)
-
-            # Run query
-            result = run_query(sql)
-            print(f"    Count: {result['count']}, Time: {format_time(result['time_ms'])}")
-
-            # Run EXPLAIN (warm cache is fine)
-            explain = run_explain(sql)
-
-            div_results["queries"][query["name"]] = {
-                "description": query["description"],
-                "count": result["count"],
-                "time_ms": result["time_ms"],
-                "explain": explain,
-            }
-
-        all_results.append(div_results)
-        print()
-
-    # Write markdown results
-    with open(result_file, "w") as f:
-        f.write("# Benchmark Results\n\n")
-        f.write(f"**Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
-        f.write(f"**SQL File:** `{sql_path}`\n\n")
-        f.write("**Method:** Cold cache (PostgreSQL restarted before each query)\n\n")
-
-        # Summary table
-        f.write("## Summary\n\n")
-        headers = ["Country", "Places"] + [q["name"] for q in queries] + ["Best"]
-        f.write("| " + " | ".join(headers) + " |\n")
-        f.write("|" + "|".join(["---"] * len(headers)) + "|\n")
-
-        for r in all_results:
-            times = {name: q["time_ms"] for name, q in r["queries"].items()}
-            best_name = min(times, key=lambda k: times[k] or float("inf"))
-
-            # Get count from first query
-            first_query = list(r["queries"].values())[0]
-            count = first_query["count"]
-            count_str = f"{count:,}" if count else "N/A"
-
-            row = [r["name"], count_str]
-            for q in queries:
-                t = r["queries"][q["name"]]["time_ms"]
-                time_str = format_time(t)
-                if q["name"] == best_name:
-                    time_str = f"**{time_str}**"
-                row.append(time_str)
-            row.append(best_name)
-
-            f.write("| " + " | ".join(row) + " |\n")
-
-        f.write("\n")
-
-        # Detailed results
-        for r in all_results:
-            f.write(f"## {r['name']}\n\n")
-            f.write(f"**Division ID:** `{r['id']}`\n\n")
-
-            for query in queries:
-                q = r["queries"][query["name"]]
-                f.write(f"### {query['name']}\n\n")
-                if q["description"]:
-                    f.write(f"{q['description']}\n\n")
-
-                count_str = f"{q['count']:,}" if q["count"] else "N/A"
-                f.write(f"**Count:** {count_str}\n\n")
-                f.write(f"**Time:** {format_time(q['time_ms'])}\n\n")
-                f.write("**EXPLAIN ANALYZE:**\n\n")
-                f.write("```\n")
-                f.write(q["explain"].strip())
-                f.write("\n```\n\n")
-
-    print(f"Results saved to: {result_file}")
+    if args.config_items:
+        config = load_config(folder)
+        print(json.dumps(config))
+    elif args.list:
+        if not folder.exists():
+            print(json.dumps({"error": f"Folder not found: {folder}"}))
+            return
+        queries = list_queries(folder)
+        print(json.dumps(queries))
+    elif args.query and args.config:
+        if not folder.exists():
+            print(json.dumps({"error": f"Folder not found: {folder}"}))
+            return
+        config = json.loads(args.config)
+        result = run_query(folder, args.query, config)
+        print(json.dumps(result))
+    else:
+        parser.print_help()
 
 
 if __name__ == "__main__":

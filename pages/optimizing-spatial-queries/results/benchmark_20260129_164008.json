@@ -1,0 +1,30 @@
+[
+{"division": "Argentina", "division_id": "6aaadea0-9c48-4af0-a47f-bbe020540580", "queries": [
+{
+  "query": "cte",
+  "description": "Using MATERIALIZED CTE",
+  "division_id": "6aaadea0-9c48-4af0-a47f-bbe020540580",
+  "count": 822527,
+  "time_ms": 884556.55,
+  "explain": "Nested Loop  (cost=8.87..29.42 rows=72 width=124) (actual time=2166.371..877548.438 rows=822527 loops=1)\n  CTE div\n    ->  Index Scan using divisions_id_idx on divisions  (cost=0.43..8.45 rows=1 width=5488) (actual time=0.050..0.055 rows=1 loops=1)\n          Index Cond: (id = '6aaadea0-9c48-4af0-a47f-bbe020540580'::text)\n  ->  CTE Scan on div  (cost=0.00..0.02 rows=1 width=32) (actual time=0.052..0.058 rows=1 loops=1)\n  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=2165.475..877313.590 rows=822527 loops=1)\n        Index Cond: ((geometry && div.geom) AND (geometry @ div.geom))\n        Filter: st_covers(div.geom, geometry)\n        Rows Removed by Filter: 625443\nPlanning Time: 1.528 ms\nExecution Time: 877629.442 ms"
+}
+,
+{
+  "query": "join",
+  "description": "Direct JOIN without CTE",
+  "division_id": "6aaadea0-9c48-4af0-a47f-bbe020540580",
+  "count": 822527,
+  "time_ms": 884202.76,
+  "explain": "Nested Loop  (cost=0.85..29.40 rows=128 width=5632) (actual time=2165.945..878891.916 rows=822527 loops=1)\n  ->  Index Scan using divisions_id_idx on divisions d  (cost=0.43..8.45 rows=1 width=5540) (actual time=0.051..0.055 rows=1 loops=1)\n        Index Cond: (id = '6aaadea0-9c48-4af0-a47f-bbe020540580'::text)\n  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=2165.020..878660.672 rows=822527 loops=1)\n        Index Cond: ((geometry && d.geometry) AND (geometry @ d.geometry))\n        Filter: st_covers(d.geometry, geometry)\n        Rows Removed by Filter: 625443\nPlanning Time: 3.312 ms\nExecution Time: 878978.808 ms"
+}
+,
+{
+  "query": "simplified",
+  "description": "Using MATERIALIZED CTE with ST_Simplify + ST_Buffer",
+  "division_id": "6aaadea0-9c48-4af0-a47f-bbe020540580",
+  "count": 827138,
+  "time_ms": 53600.26,
+  "explain": "Nested Loop  (cost=21.49..42.04 rows=72 width=124) (actual time=146.562..53140.163 rows=827138 loops=1)\n  CTE div\n    ->  Index Scan using divisions_id_idx on divisions  (cost=0.43..21.07 rows=1 width=32) (actual time=17.261..17.270 rows=1 loops=1)\n          Index Cond: (id = '6aaadea0-9c48-4af0-a47f-bbe020540580'::text)\n  ->  CTE Scan on div  (cost=0.00..0.02 rows=1 width=32) (actual time=17.280..17.289 rows=1 loops=1)\n  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=129.242..53015.558 rows=827138 loops=1)\n        Index Cond: ((geometry && div.geom) AND (geometry @ div.geom))\n        Filter: st_covers(div.geom, geometry)\n        Rows Removed by Filter: 621560\nPlanning Time: 0.337 ms\nExecution Time: 53178.125 ms"
+}
+]}
+]
