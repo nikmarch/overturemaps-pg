@@ -13,26 +13,25 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+import psycopg2
 
-def ensure_containers_running():
-    """Start containers if not running."""
-    result = subprocess.run(
-        ["docker", "compose", "ps", "--status", "running", "-q"],
-        capture_output=True,
-        text=True,
+
+def get_db_connection():
+    """Get a connection to the database."""
+    return psycopg2.connect(
+        host="db",
+        port=5432,
+        user="postgres",
+        password="postgres",
+        dbname="overturemaps",
     )
-    if not result.stdout.strip():
-        print("Starting containers...")
-        subprocess.run(["docker", "compose", "down"], capture_output=True)
-        subprocess.run(["docker", "compose", "up", "-d"], check=True)
-        wait_for_db()
 
 
 def wait_for_db():
     """Wait for database to be ready."""
     for _ in range(60):
         result = subprocess.run(
-            ["docker", "compose", "exec", "-T", "db", "pg_isready", "-U", "postgres"],
+            ["docker", "exec", "overturemaps-pg-db-1", "pg_isready", "-U", "postgres"],
             capture_output=True,
         )
         if result.returncode == 0:
@@ -43,23 +42,37 @@ def wait_for_db():
 
 
 def restart_db():
-    """Restart PostgreSQL via docker compose and wait for ready."""
+    """Restart PostgreSQL via docker and wait for ready."""
     print("restarting db...", end=" ", flush=True)
-    subprocess.run(["docker", "compose", "restart", "db"], capture_output=True, check=True)
+    subprocess.run(["docker", "restart", "overturemaps-pg-db-1"], capture_output=True, check=True)
     wait_for_db()
     print("ready.", end=" ", flush=True)
 
 
 def run_query(sql: str) -> tuple[float, str]:
-    """Run SQL via psql and return (time_ms, output)."""
-    start = time.perf_counter()
-    result = subprocess.run(
-        ["docker", "compose", "exec", "-T", "db", "psql", "-U", "postgres", "-d", "overturemaps", "-c", sql],
-        capture_output=True,
-        text=True,
-    )
-    elapsed_ms = (time.perf_counter() - start) * 1000
-    return elapsed_ms, result.stdout.strip()
+    """Run SQL via psycopg2 and return (time_ms, output)."""
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        start = time.perf_counter()
+        cur.execute(sql)
+        rows = cur.fetchall()
+        elapsed_ms = (time.perf_counter() - start) * 1000
+
+        # Format output similar to psql
+        if cur.description:
+            col_names = [desc[0] for desc in cur.description]
+            output_lines = [" | ".join(col_names)]
+            output_lines.append("-+-".join("-" * len(name) for name in col_names))
+            for row in rows:
+                output_lines.append(" | ".join(str(val) for val in row))
+            output = "\n".join(output_lines)
+        else:
+            output = ""
+
+        return elapsed_ms, output
+    finally:
+        conn.close()
 
 
 def main():
@@ -68,7 +81,6 @@ def main():
     args = parser.parse_args()
 
     folder = Path(args.folder)
-    ensure_containers_running()
     config_items = json.loads((folder / "_config.json").read_text())
     sql_files = sorted(folder.glob("*.sql"))
 

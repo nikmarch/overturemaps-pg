@@ -6,4 +6,4 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
-python3 scripts/benchmark.py "$1"
+docker compose run --rm --build server python3 /app/scripts/benchmark.py "$1"
