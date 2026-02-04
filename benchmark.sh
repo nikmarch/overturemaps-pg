@@ -2,7 +2,8 @@
 set -e
 
 if [ -z "$1" ]; then
-    echo "Usage: ./benchmark.sh <queries-folder>"
+    echo "Usage: ./benchmark.sh <page-folder>"
+    echo "Example: ./benchmark.sh pages/optimizing-spatial-queries"
     exit 1
 fi
 

@@ -3,7 +3,14 @@
 Benchmark runner - substitutes config values into SQL, runs with timing.
 
 Usage:
-    python benchmark.py <queries-folder>
+    python benchmark.py <page-folder>
+
+Expects:
+    <page-folder>/queries/_config.json
+    <page-folder>/queries/*.sql
+
+Writes results to:
+    <page-folder>/results/benchmark_<timestamp>.md
 """
 
 import argparse
@@ -77,15 +84,19 @@ def run_query(sql: str) -> tuple[float, str]:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("folder", help="Folder with .sql files and _config.json")
+    parser.add_argument("folder", help="Folder with queries/ and results/ subdirectories")
     args = parser.parse_args()
 
     folder = Path(args.folder)
-    config_items = json.loads((folder / "_config.json").read_text())
-    sql_files = sorted(folder.glob("*.sql"))
+    queries_dir = folder / "queries"
+    results_dir = folder / "results"
 
+    config_items = json.loads((queries_dir / "_config.json").read_text())
+    sql_files = sorted(queries_dir.glob("*.sql"))
+
+    results_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-    output_file = folder / f"benchmark_{timestamp}.md"
+    output_file = results_dir / f"benchmark_{timestamp}.md"
 
     lines = [
         "# Benchmark Results",

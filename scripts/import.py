@@ -43,7 +43,7 @@ def table_exists(con, table):
 
 
 def main():
-    sql_dir = Path(__file__).parent / "sql"
+    sql_dir = Path("/app/import")
 
     args = sys.argv[1:]
     drop = "--drop" in args
