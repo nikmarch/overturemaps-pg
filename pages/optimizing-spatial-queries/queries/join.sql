@@ -1,4 +1,12 @@
 EXPLAIN ANALYZE
-SELECT COUNT(*) FROM places p
-JOIN divisions d ON p.geometry && d.geometry AND ST_Covers(d.geometry, p.geometry)
+SELECT * FROM places AS p
+INNER JOIN
+    divisions AS d
+    ON p.geometry && d.geometry AND ST_COVERS(d.geometry, p.geometry)
+WHERE d.id = '{id}';
+
+SELECT COUNT(*) FROM places AS p
+INNER JOIN
+    divisions AS d
+    ON p.geometry && d.geometry AND ST_COVERS(d.geometry, p.geometry)
 WHERE d.id = '{id}';

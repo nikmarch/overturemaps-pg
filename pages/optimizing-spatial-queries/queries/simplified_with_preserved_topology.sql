@@ -1,6 +1,6 @@
 EXPLAIN ANALYZE
 WITH div AS MATERIALIZED (
-    SELECT ST_BUFFER(ST_SIMPLIFY(geometry, 0.01), 0.01) AS geom
+    SELECT ST_SIMPLIFYPRESERVETOPOLOGY(geometry, 0.01) AS geom
     FROM divisions
     WHERE id = '{id}'
 )
@@ -11,7 +11,7 @@ WHERE
     AND ST_COVERS(div.geom, p.geometry);
 
 WITH div AS MATERIALIZED (
-    SELECT ST_BUFFER(ST_SIMPLIFY(geometry, 0.01), 0.01) AS geom
+    SELECT ST_SIMPLIFYPRESERVETOPOLOGY(geometry, 0.01) AS geom
     FROM divisions
     WHERE id = '{id}'
 )
