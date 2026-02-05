@@ -2,6 +2,13 @@
 """
 Benchmark runner - substitutes config values into SQL, runs with timing.
 
+Each SQL file may contain multiple semicolon-separated statements (e.g.
+EXPLAIN ANALYZE followed by SELECT COUNT(*)). The database is restarted
+once per SQL file so the first statement runs against a cold cache while
+subsequent statements see a warm cache. Each statement is executed and
+timed individually, and all results are written to one timestamped
+markdown file.
+
 Usage:
     python benchmark.py <page-folder>
 
@@ -82,6 +89,11 @@ def run_query(sql: str) -> tuple[float, str]:
         conn.close()
 
 
+def split_sql_statements(sql: str) -> list[str]:
+    """Split SQL text on semicolons. Safe when files have no semicolons in literals."""
+    return [s.strip() for s in sql.split(";") if s.strip()]
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("folder", help="Folder with queries/ and results/ subdirectories")
@@ -92,7 +104,7 @@ def main():
     results_dir = folder / "results"
 
     config_items = json.loads((queries_dir / "_config.json").read_text())
-    sql_files = sorted(queries_dir.glob("*.sql"))
+    sql_files = sorted(queries_dir.glob("*.sql"), key=lambda f: f.name)
 
     results_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
@@ -103,7 +115,7 @@ def main():
         "",
         f"**Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         "",
-        "**Method:** Cold cache (PostgreSQL restarted before each query)",
+        "**Method:** Cold cache (PostgreSQL restarted before each SQL file)",
         "",
     ]
 
@@ -116,29 +128,37 @@ def main():
             raw_sql = sql_file.read_text().strip()
 
             # Substitute {key} placeholders
-            sql = raw_sql
+            rendered = raw_sql
             for key, value in config.items():
-                sql = sql.replace(f"{{{key}}}", str(value))
+                rendered = rendered.replace(f"{{{key}}}", str(value))
+
+            statements = split_sql_statements(rendered)
 
             print(f"  {sql_file.stem}: ", end="", flush=True)
             restart_db()
-            elapsed_ms, output = run_query(sql)
-            print(f"{elapsed_ms:.1f}ms")
 
-            lines.extend([
-                f"### {sql_file.stem}",
-                "",
-                "```sql",
-                sql,
-                "```",
-                "",
-                f"**Time:** {elapsed_ms:.1f}ms",
-                "",
-                "```",
-                output,
-                "```",
-                "",
-            ])
+            lines.extend([f"### {sql_file.stem}", ""])
+
+            for i, stmt in enumerate(statements, 1):
+                elapsed_ms, output = run_query(stmt)
+                print(f"stmt{i}={elapsed_ms:.1f}ms ", end="", flush=True)
+
+                lines.extend([
+                    f"**Statement {i}:**",
+                    "",
+                    "```sql",
+                    stmt,
+                    "```",
+                    "",
+                    f"**Time:** {elapsed_ms:.1f}ms",
+                    "",
+                    "```",
+                    output,
+                    "```",
+                    "",
+                ])
+
+            print()
 
     output_file.write_text("\n".join(lines))
     print(f"Done! Saved to {output_file}")
