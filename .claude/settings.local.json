@@ -18,7 +18,8 @@
       "Bash(done)",
       "WebFetch(domain:duckdb.org)",
       "WebFetch(domain:docs.overturemaps.org)",
-      "Bash(docker compose:*)"
+      "Bash(docker compose:*)",
+      "Bash(duckdb:*)"
     ]
   }
 }
