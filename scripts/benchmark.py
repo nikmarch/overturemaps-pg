@@ -123,7 +123,10 @@ def main():
 
     with open(queries_dir / "_config.csv") as f:
         config_items = list(csv.DictReader(f))
-    sql_files = sorted(queries_dir.glob("*.sql"), key=lambda f: f.name)
+    sql_files = sorted(
+        (f for f in queries_dir.glob("*.sql") if not f.name.startswith("_")),
+        key=lambda f: f.name,
+    )
 
     # First pass: read SQL files and build CSV header
     config_fields = list(config_items[0].keys())
