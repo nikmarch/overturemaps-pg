@@ -126,8 +126,9 @@ def main():
     sql_files = sorted(queries_dir.glob("*.sql"), key=lambda f: f.name)
 
     # First pass: read SQL files and build CSV header
+    config_fields = list(config_items[0].keys())
     sql_contents = {}
-    header = ["name"]
+    header = list(config_fields)
     for sql_file in sql_files:
         raw_sql = sql_file.read_text().strip()
         stmts = split_sql_statements(raw_sql)
@@ -139,43 +140,41 @@ def main():
     timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
     output_file = results_dir / f"results_{timestamp}.csv"
 
-    # Second pass: run benchmarks and collect rows
-    rows = []
-    for config in config_items:
-        name = config.get("name", config.get("id", "unknown"))
-        print(f"## {name}")
-        row = {"name": name}
-
-        for sql_file in sql_files:
-            raw_sql, _stmts_template, col_names = sql_contents[sql_file]
-
-            # Substitute {key} placeholders
-            rendered = raw_sql
-            for key, value in config.items():
-                rendered = rendered.replace(f"{{{key}}}", str(value))
-
-            statements = split_sql_statements(rendered)
-
-            print(f"  {sql_file.stem}: ", end="", flush=True)
-            restart_db()
-
-            for i, stmt in enumerate(statements):
-                elapsed_ms, output = run_query(stmt)
-                result_col = col_names[i * 2]
-                time_col = col_names[i * 2 + 1]
-                print(f"{result_col}={elapsed_ms:.1f}ms ", end="", flush=True)
-                row[result_col] = output
-                row[time_col] = f"{elapsed_ms:.1f}"
-
-            print()
-
-        rows.append(row)
-
-    # Write CSV
+    # Stream rows to CSV as each config completes
     with open(output_file, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=header)
         writer.writeheader()
-        writer.writerows(rows)
+
+        for config in config_items:
+            name = config.get("name", config.get("id", "unknown"))
+            print(f"## {name}")
+            row = dict(config)
+
+            for sql_file in sql_files:
+                raw_sql, _stmts_template, col_names = sql_contents[sql_file]
+
+                # Substitute {key} placeholders
+                rendered = raw_sql
+                for key, value in config.items():
+                    rendered = rendered.replace(f"{{{key}}}", str(value))
+
+                statements = split_sql_statements(rendered)
+
+                print(f"  {sql_file.stem}: ", end="", flush=True)
+                restart_db()
+
+                for i, stmt in enumerate(statements):
+                    elapsed_ms, output = run_query(stmt)
+                    result_col = col_names[i * 2]
+                    time_col = col_names[i * 2 + 1]
+                    print(f"{result_col}={elapsed_ms:.1f}ms ", end="", flush=True)
+                    row[result_col] = output
+                    row[time_col] = f"{elapsed_ms:.1f}"
+
+                print()
+
+            writer.writerow(row)
+            f.flush()
 
     print(f"Done! Saved to {output_file}")
 
