@@ -6,22 +6,24 @@ Each SQL file may contain multiple semicolon-separated statements (e.g.
 EXPLAIN ANALYZE followed by SELECT COUNT(*)). The database is restarted
 once per SQL file so the first statement runs against a cold cache while
 subsequent statements see a warm cache. Each statement is executed and
-timed individually, and all results are written to one timestamped
-markdown file.
+timed individually, and all results are written to one timestamped CSV.
+
+Column names come from a `-- columns:` comment on the first line of each
+SQL file. If absent, columns are named s1, s2, etc.
 
 Usage:
     python benchmark.py <page-folder>
 
 Expects:
-    <page-folder>/queries/_config.json
+    <page-folder>/queries/_config.csv
     <page-folder>/queries/*.sql
 
 Writes results to:
-    <page-folder>/results/benchmark_<timestamp>.md
+    <page-folder>/results/results_<timestamp>.csv
 """
 
 import argparse
-import json
+import csv
 import subprocess
 import time
 from datetime import datetime
@@ -94,6 +96,16 @@ def split_sql_statements(sql: str) -> list[str]:
     return [s.strip() for s in sql.split(";") if s.strip()]
 
 
+def parse_column_names(sql: str, file_stem: str, num_stmts: int) -> list[str]:
+    """Parse column names from a `-- columns:` comment on the first line."""
+    first_line = sql.split("\n", 1)[0].strip()
+    if first_line.startswith("-- columns:"):
+        names = [n.strip() for n in first_line.split(":", 1)[1].split(",")]
+    else:
+        names = [f"s{i}" for i in range(1, num_stmts + 1)]
+    return [f"{file_stem}_{n}" for n in names]
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("folder", help="Folder with queries/ and results/ subdirectories")
@@ -103,29 +115,33 @@ def main():
     queries_dir = folder / "queries"
     results_dir = folder / "results"
 
-    config_items = json.loads((queries_dir / "_config.json").read_text())
+    with open(queries_dir / "_config.csv") as f:
+        config_items = list(csv.DictReader(f))
     sql_files = sorted(queries_dir.glob("*.sql"), key=lambda f: f.name)
+
+    # First pass: read SQL files and build CSV header
+    sql_contents = {}
+    header = ["name"]
+    for sql_file in sql_files:
+        raw_sql = sql_file.read_text().strip()
+        stmts = split_sql_statements(raw_sql)
+        col_names = parse_column_names(raw_sql, sql_file.stem, len(stmts))
+        sql_contents[sql_file] = (raw_sql, stmts, col_names)
+        header.extend(col_names)
 
     results_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-    output_file = results_dir / f"benchmark_{timestamp}.md"
+    output_file = results_dir / f"results_{timestamp}.csv"
 
-    lines = [
-        "# Benchmark Results",
-        "",
-        f"**Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-        "",
-        "**Method:** Cold cache (PostgreSQL restarted before each SQL file)",
-        "",
-    ]
-
+    # Second pass: run benchmarks and collect rows
+    rows = []
     for config in config_items:
         name = config.get("name", config.get("id", "unknown"))
         print(f"## {name}")
-        lines.extend([f"## {name}", "", f"**Config:** `{json.dumps(config)}`", ""])
+        row = {"name": name}
 
         for sql_file in sql_files:
-            raw_sql = sql_file.read_text().strip()
+            raw_sql, _stmts_template, col_names = sql_contents[sql_file]
 
             # Substitute {key} placeholders
             rendered = raw_sql
@@ -137,30 +153,21 @@ def main():
             print(f"  {sql_file.stem}: ", end="", flush=True)
             restart_db()
 
-            lines.extend([f"### {sql_file.stem}", ""])
-
-            for i, stmt in enumerate(statements, 1):
-                elapsed_ms, output = run_query(stmt)
-                print(f"stmt{i}={elapsed_ms:.1f}ms ", end="", flush=True)
-
-                lines.extend([
-                    f"**Statement {i}:**",
-                    "",
-                    "```sql",
-                    stmt,
-                    "```",
-                    "",
-                    f"**Time:** {elapsed_ms:.1f}ms",
-                    "",
-                    "```",
-                    output,
-                    "```",
-                    "",
-                ])
+            for i, stmt in enumerate(statements):
+                elapsed_ms, _output = run_query(stmt)
+                print(f"{col_names[i]}={elapsed_ms:.1f}ms ", end="", flush=True)
+                row[col_names[i]] = f"{elapsed_ms:.1f}"
 
             print()
 
-    output_file.write_text("\n".join(lines))
+        rows.append(row)
+
+    # Write CSV
+    with open(output_file, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=header)
+        writer.writeheader()
+        writer.writerows(rows)
+
     print(f"Done! Saved to {output_file}")
 
 

@@ -1,3 +1,4 @@
+-- columns: analyze, total
 EXPLAIN ANALYZE
 WITH div AS MATERIALIZED (
     SELECT ST_SIMPLIFYPRESERVETOPOLOGY(geometry, 0.01) AS geom

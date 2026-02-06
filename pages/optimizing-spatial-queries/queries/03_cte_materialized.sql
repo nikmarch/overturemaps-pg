@@ -1,3 +1,4 @@
+-- columns: analyze, total
 EXPLAIN ANALYZE
 WITH div AS MATERIALIZED (
     SELECT geometry AS geom FROM divisions

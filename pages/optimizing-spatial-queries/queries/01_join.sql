@@ -1,3 +1,4 @@
+-- columns: analyze, total
 EXPLAIN ANALYZE
 SELECT * FROM places AS p
 INNER JOIN

@@ -1,3 +1,4 @@
+-- columns: analyze, total
 EXPLAIN ANALYZE
 WITH div AS MATERIALIZED (
     SELECT ST_BUFFER(ST_SIMPLIFY(geometry, 0.01), 0.01) AS geom
