@@ -103,7 +103,13 @@ def parse_column_names(sql: str, file_stem: str, num_stmts: int) -> list[str]:
         names = [n.strip() for n in first_line.split(":", 1)[1].split(",")]
     else:
         names = [f"s{i}" for i in range(1, num_stmts + 1)]
-    return [f"{file_stem}_{n}" for n in names]
+    base = [f"{file_stem}_{n}" for n in names]
+    # Each statement gets a result column and a _time column
+    cols = []
+    for b in base:
+        cols.append(b)
+        cols.append(f"{b}_time")
+    return cols
 
 
 def main():
@@ -154,9 +160,12 @@ def main():
             restart_db()
 
             for i, stmt in enumerate(statements):
-                elapsed_ms, _output = run_query(stmt)
-                print(f"{col_names[i]}={elapsed_ms:.1f}ms ", end="", flush=True)
-                row[col_names[i]] = f"{elapsed_ms:.1f}"
+                elapsed_ms, output = run_query(stmt)
+                result_col = col_names[i * 2]
+                time_col = col_names[i * 2 + 1]
+                print(f"{result_col}={elapsed_ms:.1f}ms ", end="", flush=True)
+                row[result_col] = output
+                row[time_col] = f"{elapsed_ms:.1f}"
 
             print()
 
