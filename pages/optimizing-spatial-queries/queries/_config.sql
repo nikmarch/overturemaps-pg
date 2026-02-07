@@ -4,7 +4,7 @@ SELECT
     class,
     name,
     ST_NPOINTS(geometry) AS points,
-    ST_AREA(geometry) AS sqm
+    ST_AREA(geometry) AS area
 FROM divisions
 WHERE
     osm_id LIKE 'r%'

@@ -1,0 +1,487 @@
+id,osm_id,class,name,points,sqm,01_join_analyze,01_join_analyze_time,01_join_total,01_join_total_time,02_cte_analyze,02_cte_analyze_time,02_cte_total,02_cte_total_time,03_cte_materialized_analyze,03_cte_materialized_analyze_time,03_cte_materialized_total,03_cte_materialized_total_time,04_simplified_analyze,04_simplified_analyze_time,04_simplified_total,04_simplified_total_time,05_simplified_with_preserved_topology_analyze,05_simplified_with_preserved_topology_analyze_time,05_simplified_with_preserved_topology_total,05_simplified_with_preserved_topology_total_time,06_simplified_with_preserved_topology_buffered_analyze,06_simplified_with_preserved_topology_buffered_analyze_time,06_simplified_with_preserved_topology_buffered_total,06_simplified_with_preserved_topology_buffered_total_time
+d0d6962c-5bb5-459b-a2a0-9316e3e5e30a,r2186646,land,Antarctica,26008,4879.5305669429235,"QUERY PLAN
+----------
+Nested Loop  (cost=0.85..29.40 rows=142 width=5588) (actual time=4.303..43.745 rows=1323 loops=1)
+  ->  Index Scan using divisions_pkey on divisions d  (cost=0.43..8.45 rows=1 width=5496) (actual time=0.609..0.609 rows=1 loops=1)
+        Index Cond: (id = 'd0d6962c-5bb5-459b-a2a0-9316e3e5e30a'::text)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=2.500..41.837 rows=1323 loops=1)
+        Index Cond: ((geometry && d.geometry) AND (geometry @ d.geometry))
+        Filter: st_covers(d.geometry, geometry)
+        Rows Removed by Filter: 627
+Planning Time: 9.018 ms
+Execution Time: 43.966 ms",53.8,"count
+-----
+1323",51.3,"QUERY PLAN
+----------
+Nested Loop  (cost=0.85..29.40 rows=142 width=5531) (actual time=3.006..46.771 rows=1323 loops=1)
+  ->  Index Scan using divisions_pkey on divisions  (cost=0.43..8.45 rows=1 width=5439) (actual time=0.045..0.046 rows=1 loops=1)
+        Index Cond: (id = 'd0d6962c-5bb5-459b-a2a0-9316e3e5e30a'::text)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=2.163..45.824 rows=1323 loops=1)
+        Index Cond: ((geometry && divisions.geometry) AND (geometry @ divisions.geometry))
+        Filter: st_covers(divisions.geometry, geometry)
+        Rows Removed by Filter: 627
+Planning Time: 9.032 ms
+Execution Time: 47.050 ms",57.0,"count
+-----
+1323",50.7,"QUERY PLAN
+----------
+Nested Loop  (cost=8.87..29.42 rows=72 width=124) (actual time=3.068..42.095 rows=1323 loops=1)
+  CTE div
+    ->  Index Scan using divisions_pkey on divisions  (cost=0.43..8.45 rows=1 width=5439) (actual time=0.044..0.045 rows=1 loops=1)
+          Index Cond: (id = 'd0d6962c-5bb5-459b-a2a0-9316e3e5e30a'::text)
+  ->  CTE Scan on div  (cost=0.00..0.02 rows=1 width=32) (actual time=0.045..0.046 rows=1 loops=1)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=2.220..41.144 rows=1323 loops=1)
+        Index Cond: ((geometry && div.geom) AND (geometry @ div.geom))
+        Filter: st_covers(div.geom, geometry)
+        Rows Removed by Filter: 627
+Planning Time: 8.622 ms
+Execution Time: 42.320 ms",51.9,"count
+-----
+1323",46.1,"QUERY PLAN
+----------
+Nested Loop  (cost=21.49..42.04 rows=72 width=124) (actual time=71.221..171.848 rows=1346 loops=1)
+  CTE div
+    ->  Index Scan using divisions_pkey on divisions  (cost=0.43..21.07 rows=1 width=32) (actual time=68.531..68.663 rows=1 loops=1)
+          Index Cond: (id = 'd0d6962c-5bb5-459b-a2a0-9316e3e5e30a'::text)
+  ->  CTE Scan on div  (cost=0.00..0.02 rows=1 width=32) (actual time=68.594..68.727 rows=1 loops=1)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=2.619..102.891 rows=1346 loops=1)
+        Index Cond: ((geometry && div.geom) AND (geometry @ div.geom))
+        Filter: st_covers(div.geom, geometry)
+        Rows Removed by Filter: 604
+Planning Time: 7.022 ms
+Execution Time: 172.019 ms",181.3,"count
+-----
+1346",168.1,"QUERY PLAN
+----------
+Nested Loop  (cost=21.37..41.92 rows=72 width=124) (actual time=37.777..71.721 rows=1321 loops=1)
+  CTE div
+    ->  Index Scan using divisions_pkey on divisions  (cost=0.43..20.95 rows=1 width=32) (actual time=37.081..37.128 rows=1 loops=1)
+          Index Cond: (id = 'd0d6962c-5bb5-459b-a2a0-9316e3e5e30a'::text)
+  ->  CTE Scan on div  (cost=0.00..0.02 rows=1 width=32) (actual time=37.155..37.202 rows=1 loops=1)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=0.618..34.404 rows=1321 loops=1)
+        Index Cond: ((geometry && div.geom) AND (geometry @ div.geom))
+        Filter: st_covers(div.geom, geometry)
+        Rows Removed by Filter: 629
+Planning Time: 7.339 ms
+Execution Time: 71.833 ms",80.3,"count
+-----
+1321",76.0,"QUERY PLAN
+----------
+Nested Loop  (cost=33.87..54.42 rows=72 width=124) (actual time=545.201..685.362 rows=1354 loops=1)
+  CTE div
+    ->  Index Scan using divisions_pkey on divisions  (cost=0.43..33.45 rows=1 width=32) (actual time=540.309..540.370 rows=1 loops=1)
+          Index Cond: (id = 'd0d6962c-5bb5-459b-a2a0-9316e3e5e30a'::text)
+  ->  CTE Scan on div  (cost=0.00..0.02 rows=1 width=32) (actual time=540.406..540.468 rows=1 loops=1)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=4.788..144.699 rows=1354 loops=1)
+        Index Cond: ((geometry && div.geom) AND (geometry @ div.geom))
+        Filter: st_covers(div.geom, geometry)
+        Rows Removed by Filter: 596
+Planning Time: 7.218 ms
+Execution Time: 685.511 ms",694.2,"count
+-----
+1354",676.6
+ede685d8-d67e-48ff-8c05-e6e41a3227a0,r60189,maritime,Россия,165513,3232.9562361291364,"QUERY PLAN
+----------
+Nested Loop  (cost=0.85..29.40 rows=142 width=5588) (actual time=3191.277..23091.466 rows=632217 loops=1)
+  ->  Index Scan using divisions_pkey on divisions d  (cost=0.43..8.45 rows=1 width=5496) (actual time=0.045..0.048 rows=1 loops=1)
+        Index Cond: (id = 'ede685d8-d67e-48ff-8c05-e6e41a3227a0'::text)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=3186.874..23044.708 rows=632217 loops=1)
+        Index Cond: ((geometry && d.geometry) AND (geometry @ d.geometry))
+        Filter: st_covers(d.geometry, geometry)
+        Rows Removed by Filter: 23920618
+Planning Time: 8.298 ms
+Execution Time: 23106.388 ms",23115.8,"count
+-----
+632217",21175.8,"QUERY PLAN
+----------
+Nested Loop  (cost=0.85..29.40 rows=142 width=5531) (actual time=3421.836..23095.235 rows=632217 loops=1)
+  ->  Index Scan using divisions_pkey on divisions  (cost=0.43..8.45 rows=1 width=5439) (actual time=0.042..0.045 rows=1 loops=1)
+        Index Cond: (id = 'ede685d8-d67e-48ff-8c05-e6e41a3227a0'::text)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=3417.254..23051.078 rows=632217 loops=1)
+        Index Cond: ((geometry && divisions.geometry) AND (geometry @ divisions.geometry))
+        Filter: st_covers(divisions.geometry, geometry)
+        Rows Removed by Filter: 23920618
+Planning Time: 8.500 ms
+Execution Time: 23109.880 ms",23119.5,"count
+-----
+632217",21236.5,"QUERY PLAN
+----------
+Nested Loop  (cost=8.87..29.42 rows=72 width=124) (actual time=3422.631..23446.707 rows=632217 loops=1)
+  CTE div
+    ->  Index Scan using divisions_pkey on divisions  (cost=0.43..8.45 rows=1 width=5439) (actual time=0.045..0.048 rows=1 loops=1)
+          Index Cond: (id = 'ede685d8-d67e-48ff-8c05-e6e41a3227a0'::text)
+  ->  CTE Scan on div  (cost=0.00..0.02 rows=1 width=32) (actual time=0.046..0.050 rows=1 loops=1)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=3418.105..23403.620 rows=632217 loops=1)
+        Index Cond: ((geometry && div.geom) AND (geometry @ div.geom))
+        Filter: st_covers(div.geom, geometry)
+        Rows Removed by Filter: 23920618
+Planning Time: 6.740 ms
+Execution Time: 23461.557 ms",23469.5,"count
+-----
+632217",21137.2,"QUERY PLAN
+----------
+Nested Loop  (cost=21.49..42.04 rows=72 width=124) (actual time=3349.464..132375.497 rows=632825 loops=1)
+  CTE div
+    ->  Index Scan using divisions_pkey on divisions  (cost=0.43..21.07 rows=1 width=32) (actual time=13.924..14.209 rows=1 loops=1)
+          Index Cond: (id = 'ede685d8-d67e-48ff-8c05-e6e41a3227a0'::text)
+  ->  CTE Scan on div  (cost=0.00..0.02 rows=1 width=32) (actual time=13.950..14.236 rows=1 loops=1)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=3335.508..132309.617 rows=632825 loops=1)
+        Index Cond: ((geometry && div.geom) AND (geometry @ div.geom))
+        Filter: st_covers(div.geom, geometry)
+        Rows Removed by Filter: 23943828
+Planning Time: 7.740 ms
+Execution Time: 132390.991 ms",132401.4,"count
+-----
+632825",124824.0,"QUERY PLAN
+----------
+Nested Loop  (cost=21.37..41.92 rows=72 width=124) (actual time=9096.891..49933.245 rows=632246 loops=1)
+  CTE div
+    ->  Index Scan using divisions_pkey on divisions  (cost=0.43..20.95 rows=1 width=32) (actual time=181.981..181.986 rows=1 loops=1)
+          Index Cond: (id = 'ede685d8-d67e-48ff-8c05-e6e41a3227a0'::text)
+  ->  CTE Scan on div  (cost=0.00..0.02 rows=1 width=32) (actual time=181.995..182.001 rows=1 loops=1)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=8914.889..49705.941 rows=632246 loops=1)
+        Index Cond: ((geometry && div.geom) AND (geometry @ div.geom))
+        Filter: st_covers(div.geom, geometry)
+        Rows Removed by Filter: 23920589
+Planning Time: 8.671 ms
+Execution Time: 49948.405 ms",49958.4,"count
+-----
+632246",48504.1,"QUERY PLAN
+----------
+Nested Loop  (cost=33.87..54.42 rows=72 width=124) (actual time=3367.508..127503.217 rows=632825 loops=1)
+  CTE div
+    ->  Index Scan using divisions_pkey on divisions  (cost=0.43..33.45 rows=1 width=32) (actual time=185.829..185.834 rows=1 loops=1)
+          Index Cond: (id = 'ede685d8-d67e-48ff-8c05-e6e41a3227a0'::text)
+  ->  CTE Scan on div  (cost=0.00..0.02 rows=1 width=32) (actual time=185.853..185.859 rows=1 loops=1)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=3181.648..127271.350 rows=632825 loops=1)
+        Index Cond: ((geometry && div.geom) AND (geometry @ div.geom))
+        Filter: st_covers(div.geom, geometry)
+        Rows Removed by Filter: 23943828
+Planning Time: 7.057 ms
+Execution Time: 127522.051 ms",127530.3,"count
+-----
+632825",134021.0
+ac63467c-e698-452a-bce3-0729d2974a7e,r60189,land,Россия,209314,2923.7540096131793,"QUERY PLAN
+----------
+Nested Loop  (cost=0.85..29.40 rows=142 width=5588) (actual time=49499.602..261333.420 rows=631172 loops=1)
+  ->  Index Scan using divisions_pkey on divisions d  (cost=0.43..8.45 rows=1 width=5496) (actual time=0.568..0.570 rows=1 loops=1)
+        Index Cond: (id = 'ac63467c-e698-452a-bce3-0729d2974a7e'::text)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=49492.838..261282.112 rows=631172 loops=1)
+        Index Cond: ((geometry && d.geometry) AND (geometry @ d.geometry))
+        Filter: st_covers(d.geometry, geometry)
+        Rows Removed by Filter: 23921648
+Planning Time: 8.216 ms
+Execution Time: 261349.158 ms",261358.5,"count
+-----
+631172",260007.3,"QUERY PLAN
+----------
+Nested Loop  (cost=0.85..29.40 rows=142 width=5531) (actual time=49852.656..264060.508 rows=631172 loops=1)
+  ->  Index Scan using divisions_pkey on divisions  (cost=0.43..8.45 rows=1 width=5439) (actual time=0.036..0.038 rows=1 loops=1)
+        Index Cond: (id = 'ac63467c-e698-452a-bce3-0729d2974a7e'::text)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=49846.908..264014.770 rows=631172 loops=1)
+        Index Cond: ((geometry && divisions.geometry) AND (geometry @ divisions.geometry))
+        Filter: st_covers(divisions.geometry, geometry)
+        Rows Removed by Filter: 23921648
+Planning Time: 9.363 ms
+Execution Time: 264076.303 ms",264086.7,"count
+-----
+631172",269527.7,"QUERY PLAN
+----------
+Nested Loop  (cost=8.87..29.42 rows=72 width=124) (actual time=48747.471..260092.157 rows=631172 loops=1)
+  CTE div
+    ->  Index Scan using divisions_pkey on divisions  (cost=0.43..8.45 rows=1 width=5439) (actual time=0.040..0.042 rows=1 loops=1)
+          Index Cond: (id = 'ac63467c-e698-452a-bce3-0729d2974a7e'::text)
+  ->  CTE Scan on div  (cost=0.00..0.02 rows=1 width=32) (actual time=0.042..0.045 rows=1 loops=1)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=48740.962..260046.847 rows=631172 loops=1)
+        Index Cond: ((geometry && div.geom) AND (geometry @ div.geom))
+        Filter: st_covers(div.geom, geometry)
+        Rows Removed by Filter: 23921648
+Planning Time: 7.117 ms
+Execution Time: 260107.616 ms",260115.8,"count
+-----
+631172",258619.7,"QUERY PLAN
+----------
+Nested Loop  (cost=21.49..42.04 rows=72 width=124) (actual time=19675.979..750051.416 rows=632808 loops=1)
+  CTE div
+    ->  Index Scan using divisions_pkey on divisions  (cost=0.43..21.07 rows=1 width=32) (actual time=842.764..843.156 rows=1 loops=1)
+          Index Cond: (id = 'ac63467c-e698-452a-bce3-0729d2974a7e'::text)
+  ->  CTE Scan on div  (cost=0.00..0.02 rows=1 width=32) (actual time=842.921..843.315 rows=1 loops=1)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=18833.050..749106.676 rows=632808 loops=1)
+        Index Cond: ((geometry && div.geom) AND (geometry @ div.geom))
+        Filter: st_covers(div.geom, geometry)
+        Rows Removed by Filter: 23943832
+Planning Time: 9.250 ms
+Execution Time: 750080.665 ms",750093.2,"count
+-----
+632808",754346.2,"QUERY PLAN
+----------
+Nested Loop  (cost=21.37..41.92 rows=72 width=124) (actual time=118078.857..619380.991 rows=629758 loops=1)
+  CTE div
+    ->  Index Scan using divisions_pkey on divisions  (cost=0.43..20.95 rows=1 width=32) (actual time=279.581..279.667 rows=1 loops=1)
+          Index Cond: (id = 'ac63467c-e698-452a-bce3-0729d2974a7e'::text)
+  ->  CTE Scan on div  (cost=0.00..0.02 rows=1 width=32) (actual time=279.682..279.769 rows=1 loops=1)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=117799.168..619024.847 rows=629758 loops=1)
+        Index Cond: ((geometry && div.geom) AND (geometry @ div.geom))
+        Filter: st_covers(div.geom, geometry)
+        Rows Removed by Filter: 23923062
+Planning Time: 7.173 ms
+Execution Time: 619407.355 ms",619416.2,"count
+-----
+629757",612271.9,"QUERY PLAN
+----------
+Nested Loop  (cost=33.87..54.42 rows=72 width=124) (actual time=33388.592..1006462.981 rows=632818 loops=1)
+  CTE div
+    ->  Index Scan using divisions_pkey on divisions  (cost=0.43..33.45 rows=1 width=32) (actual time=7621.176..7621.276 rows=1 loops=1)
+          Index Cond: (id = 'ac63467c-e698-452a-bce3-0729d2974a7e'::text)
+  ->  CTE Scan on div  (cost=0.00..0.02 rows=1 width=32) (actual time=7621.417..7621.518 rows=1 loops=1)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=25767.167..998744.259 rows=632818 loops=1)
+        Index Cond: ((geometry && div.geom) AND (geometry @ div.geom))
+        Filter: st_covers(div.geom, geometry)
+        Rows Removed by Filter: 23943822
+Planning Time: 6.385 ms
+Execution Time: 1006491.676 ms",1006499.2,"count
+-----
+632818",969282.5
+b1409f12-e160-4f5f-b67e-be42fe68245b,r1428125,maritime,Canada,32472,2290.341743344304,"QUERY PLAN
+----------
+Nested Loop  (cost=0.85..29.40 rows=142 width=5588) (actual time=3.350..2538.273 rows=1558255 loops=1)
+  ->  Index Scan using divisions_pkey on divisions d  (cost=0.43..8.45 rows=1 width=5496) (actual time=0.607..0.610 rows=1 loops=1)
+        Index Cond: (id = 'b1409f12-e160-4f5f-b67e-be42fe68245b'::text)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=1.549..2445.382 rows=1558255 loops=1)
+        Index Cond: ((geometry && d.geometry) AND (geometry @ d.geometry))
+        Filter: st_covers(d.geometry, geometry)
+        Rows Removed by Filter: 3354965
+Planning Time: 9.025 ms
+Execution Time: 2571.374 ms",2581.5,"count
+-----
+1558255",2119.4,"QUERY PLAN
+----------
+Nested Loop  (cost=0.85..29.40 rows=142 width=5531) (actual time=2.650..2491.085 rows=1558255 loops=1)
+  ->  Index Scan using divisions_pkey on divisions  (cost=0.43..8.45 rows=1 width=5439) (actual time=0.038..0.040 rows=1 loops=1)
+        Index Cond: (id = 'b1409f12-e160-4f5f-b67e-be42fe68245b'::text)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=1.691..2408.357 rows=1558255 loops=1)
+        Index Cond: ((geometry && divisions.geometry) AND (geometry @ divisions.geometry))
+        Filter: st_covers(divisions.geometry, geometry)
+        Rows Removed by Filter: 3354965
+Planning Time: 8.602 ms
+Execution Time: 2523.546 ms",2533.2,"count
+-----
+1558255",2163.1,"QUERY PLAN
+----------
+Nested Loop  (cost=8.87..29.42 rows=72 width=124) (actual time=2.712..2522.833 rows=1558255 loops=1)
+  CTE div
+    ->  Index Scan using divisions_pkey on divisions  (cost=0.43..8.45 rows=1 width=5439) (actual time=0.041..0.044 rows=1 loops=1)
+          Index Cond: (id = 'b1409f12-e160-4f5f-b67e-be42fe68245b'::text)
+  ->  CTE Scan on div  (cost=0.00..0.02 rows=1 width=32) (actual time=0.043..0.046 rows=1 loops=1)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=1.737..2435.725 rows=1558255 loops=1)
+        Index Cond: ((geometry && div.geom) AND (geometry @ div.geom))
+        Filter: st_covers(div.geom, geometry)
+        Rows Removed by Filter: 3354965
+Planning Time: 7.318 ms
+Execution Time: 2555.621 ms",2564.0,"count
+-----
+1558255",2104.0,"QUERY PLAN
+----------
+Nested Loop  (cost=21.49..42.04 rows=72 width=124) (actual time=2.311..5176.490 rows=1563969 loops=1)
+  CTE div
+    ->  Index Scan using divisions_pkey on divisions  (cost=0.43..21.07 rows=1 width=32) (actual time=1.921..2.024 rows=1 loops=1)
+          Index Cond: (id = 'b1409f12-e160-4f5f-b67e-be42fe68245b'::text)
+  ->  CTE Scan on div  (cost=0.00..0.02 rows=1 width=32) (actual time=1.924..2.028 rows=1 loops=1)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=0.385..5070.086 rows=1563969 loops=1)
+        Index Cond: ((geometry && div.geom) AND (geometry @ div.geom))
+        Filter: st_covers(div.geom, geometry)
+        Rows Removed by Filter: 3366311
+Planning Time: 8.200 ms
+Execution Time: 5210.345 ms",5219.8,"count
+-----
+1563969",4786.2,"QUERY PLAN
+----------
+Nested Loop  (cost=21.37..41.92 rows=72 width=124) (actual time=26.494..3536.020 rows=1558247 loops=1)
+  CTE div
+    ->  Index Scan using divisions_pkey on divisions  (cost=0.43..20.95 rows=1 width=32) (actual time=26.134..26.138 rows=1 loops=1)
+          Index Cond: (id = 'b1409f12-e160-4f5f-b67e-be42fe68245b'::text)
+  ->  CTE Scan on div  (cost=0.00..0.02 rows=1 width=32) (actual time=26.139..26.143 rows=1 loops=1)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=0.350..3410.748 rows=1558247 loops=1)
+        Index Cond: ((geometry && div.geom) AND (geometry @ div.geom))
+        Filter: st_covers(div.geom, geometry)
+        Rows Removed by Filter: 3354973
+Planning Time: 7.053 ms
+Execution Time: 3568.730 ms",3577.1,"count
+-----
+1558247",2990.1,"QUERY PLAN
+----------
+Nested Loop  (cost=33.87..54.42 rows=72 width=124) (actual time=29.452..5197.530 rows=1563969 loops=1)
+  CTE div
+    ->  Index Scan using divisions_pkey on divisions  (cost=0.43..33.45 rows=1 width=32) (actual time=29.059..29.063 rows=1 loops=1)
+          Index Cond: (id = 'b1409f12-e160-4f5f-b67e-be42fe68245b'::text)
+  ->  CTE Scan on div  (cost=0.00..0.02 rows=1 width=32) (actual time=29.065..29.069 rows=1 loops=1)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=0.381..5065.707 rows=1563969 loops=1)
+        Index Cond: ((geometry && div.geom) AND (geometry @ div.geom))
+        Filter: st_covers(div.geom, geometry)
+        Rows Removed by Filter: 3366311
+Planning Time: 7.213 ms
+Execution Time: 5231.706 ms",5240.1,"count
+-----
+1563969",4916.1
+8c09baf8-d6f2-40a4-88da-d31cd0907449,r1428125,land,Canada,197948,1696.0600288492453,"QUERY PLAN
+----------
+Nested Loop  (cost=0.85..29.40 rows=142 width=5588) (actual time=16.790..175650.931 rows=1548018 loops=1)
+  ->  Index Scan using divisions_pkey on divisions d  (cost=0.43..8.45 rows=1 width=5496) (actual time=0.645..0.647 rows=1 loops=1)
+        Index Cond: (id = '8c09baf8-d6f2-40a4-88da-d31cd0907449'::text)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=10.200..175545.351 rows=1548018 loops=1)
+        Index Cond: ((geometry && d.geometry) AND (geometry @ d.geometry))
+        Filter: st_covers(d.geometry, geometry)
+        Rows Removed by Filter: 3365187
+Planning Time: 9.224 ms
+Execution Time: 175686.165 ms",175696.5,"count
+-----
+1548018",173341.4,"QUERY PLAN
+----------
+Nested Loop  (cost=0.85..29.40 rows=142 width=5531) (actual time=16.373..174269.973 rows=1548018 loops=1)
+  ->  Index Scan using divisions_pkey on divisions  (cost=0.43..8.45 rows=1 width=5439) (actual time=0.036..0.038 rows=1 loops=1)
+        Index Cond: (id = '8c09baf8-d6f2-40a4-88da-d31cd0907449'::text)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=10.451..174170.943 rows=1548018 loops=1)
+        Index Cond: ((geometry && divisions.geometry) AND (geometry @ divisions.geometry))
+        Filter: st_covers(divisions.geometry, geometry)
+        Rows Removed by Filter: 3365187
+Planning Time: 9.224 ms
+Execution Time: 174305.131 ms",174315.6,"count
+-----
+1548018",175850.0,"QUERY PLAN
+----------
+Nested Loop  (cost=8.87..29.42 rows=72 width=124) (actual time=17.509..175515.853 rows=1548018 loops=1)
+  CTE div
+    ->  Index Scan using divisions_pkey on divisions  (cost=0.43..8.45 rows=1 width=5439) (actual time=0.058..0.061 rows=1 loops=1)
+          Index Cond: (id = '8c09baf8-d6f2-40a4-88da-d31cd0907449'::text)
+  ->  CTE Scan on div  (cost=0.00..0.02 rows=1 width=32) (actual time=0.060..0.064 rows=1 loops=1)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=11.070..175415.514 rows=1548018 loops=1)
+        Index Cond: ((geometry && div.geom) AND (geometry @ div.geom))
+        Filter: st_covers(div.geom, geometry)
+        Rows Removed by Filter: 3365187
+Planning Time: 8.554 ms
+Execution Time: 175550.770 ms",175560.3,"count
+-----
+1548018",174372.6,"QUERY PLAN
+----------
+Nested Loop  (cost=21.49..42.04 rows=72 width=124) (actual time=9678.205..398875.724 rows=1563200 loops=1)
+  CTE div
+    ->  Index Scan using divisions_pkey on divisions  (cost=0.43..21.07 rows=1 width=32) (actual time=9675.113..9675.746 rows=1 loops=1)
+          Index Cond: (id = '8c09baf8-d6f2-40a4-88da-d31cd0907449'::text)
+  ->  CTE Scan on div  (cost=0.00..0.02 rows=1 width=32) (actual time=9675.657..9676.290 rows=1 loops=1)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=2.541..388921.587 rows=1563200 loops=1)
+        Index Cond: ((geometry && div.geom) AND (geometry @ div.geom))
+        Filter: st_covers(div.geom, geometry)
+        Rows Removed by Filter: 3367065
+Planning Time: 7.378 ms
+Execution Time: 398948.457 ms",398957.2,"count
+-----
+1563200",377000.1,"QUERY PLAN
+----------
+Nested Loop  (cost=21.37..41.92 rows=72 width=124) (actual time=457.533..368218.252 rows=1542223 loops=1)
+  CTE div
+    ->  Index Scan using divisions_pkey on divisions  (cost=0.43..20.95 rows=1 width=32) (actual time=455.261..455.594 rows=1 loops=1)
+          Index Cond: (id = '8c09baf8-d6f2-40a4-88da-d31cd0907449'::text)
+  ->  CTE Scan on div  (cost=0.00..0.02 rows=1 width=32) (actual time=455.571..455.905 rows=1 loops=1)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=1.955..367534.632 rows=1542223 loops=1)
+        Index Cond: ((geometry && div.geom) AND (geometry @ div.geom))
+        Filter: st_covers(div.geom, geometry)
+        Rows Removed by Filter: 3370981
+Planning Time: 8.484 ms
+Execution Time: 368286.153 ms",368295.9,"count
+-----
+1542222",364300.3,"QUERY PLAN
+----------
+Nested Loop  (cost=33.87..54.42 rows=72 width=124) (actual time=105841.795..938081.905 rows=1563485 loops=1)
+  CTE div
+    ->  Index Scan using divisions_pkey on divisions  (cost=0.43..33.45 rows=1 width=32) (actual time=105833.044..105833.408 rows=1 loops=1)
+          Index Cond: (id = '8c09baf8-d6f2-40a4-88da-d31cd0907449'::text)
+  ->  CTE Scan on div  (cost=0.00..0.02 rows=1 width=32) (actual time=105837.701..105838.065 rows=1 loops=1)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=4.084..831835.295 rows=1563485 loops=1)
+        Index Cond: ((geometry && div.geom) AND (geometry @ div.geom))
+        Filter: st_covers(div.geom, geometry)
+        Rows Removed by Filter: 3366780
+Planning Time: 7.478 ms
+Execution Time: 938169.216 ms",938178.2,"count
+-----
+1563485",979329.9
+50a03a2c-3e24-4740-b80d-f933ea60c64f,r148838,maritime,United States,124758,1224.0511042286653,"QUERY PLAN
+----------
+Nested Loop  (cost=0.85..29.40 rows=142 width=5588) (actual time=10.350..37086.760 rows=15506452 loops=1)
+  ->  Index Scan using divisions_pkey on divisions d  (cost=0.43..8.45 rows=1 width=5496) (actual time=0.369..0.372 rows=1 loops=1)
+        Index Cond: (id = '50a03a2c-3e24-4740-b80d-f933ea60c64f'::text)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=6.362..36115.729 rows=15506452 loops=1)
+        Index Cond: ((geometry && d.geometry) AND (geometry @ d.geometry))
+        Filter: st_covers(d.geometry, geometry)
+        Rows Removed by Filter: 37116802
+Planning Time: 8.281 ms
+Execution Time: 37433.094 ms",37442.8,"count
+-----
+15506452",31082.0,"QUERY PLAN
+----------
+Nested Loop  (cost=0.85..29.40 rows=142 width=5531) (actual time=8.782..29456.224 rows=15506452 loops=1)
+  ->  Index Scan using divisions_pkey on divisions  (cost=0.43..8.45 rows=1 width=5439) (actual time=0.032..0.035 rows=1 loops=1)
+        Index Cond: (id = '50a03a2c-3e24-4740-b80d-f933ea60c64f'::text)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=5.403..28596.494 rows=15506452 loops=1)
+        Index Cond: ((geometry && divisions.geometry) AND (geometry @ divisions.geometry))
+        Filter: st_covers(divisions.geometry, geometry)
+        Rows Removed by Filter: 37116802
+Planning Time: 9.401 ms
+Execution Time: 29791.611 ms",29802.1,"count
+-----
+15506452",27969.4,"QUERY PLAN
+----------
+Nested Loop  (cost=8.87..29.42 rows=72 width=124) (actual time=11.387..29296.191 rows=15506452 loops=1)
+  CTE div
+    ->  Index Scan using divisions_pkey on divisions  (cost=0.43..8.45 rows=1 width=5439) (actual time=0.050..0.052 rows=1 loops=1)
+          Index Cond: (id = '50a03a2c-3e24-4740-b80d-f933ea60c64f'::text)
+  ->  CTE Scan on div  (cost=0.00..0.02 rows=1 width=32) (actual time=0.051..0.055 rows=1 loops=1)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=6.498..28414.646 rows=15506452 loops=1)
+        Index Cond: ((geometry && div.geom) AND (geometry @ div.geom))
+        Filter: st_covers(div.geom, geometry)
+        Rows Removed by Filter: 37116802
+Planning Time: 8.575 ms
+Execution Time: 29632.887 ms",29642.6,"count
+-----
+15506452",27773.1,"QUERY PLAN
+----------
+Nested Loop  (cost=21.49..42.04 rows=72 width=124) (actual time=7.603..120633.661 rows=15547987 loops=1)
+  CTE div
+    ->  Index Scan using divisions_pkey on divisions  (cost=0.43..21.07 rows=1 width=32) (actual time=6.985..7.279 rows=1 loops=1)
+          Index Cond: (id = '50a03a2c-3e24-4740-b80d-f933ea60c64f'::text)
+  ->  CTE Scan on div  (cost=0.00..0.02 rows=1 width=32) (actual time=6.993..7.289 rows=1 loops=1)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=0.607..119552.323 rows=15547987 loops=1)
+        Index Cond: ((geometry && div.geom) AND (geometry @ div.geom))
+        Filter: st_covers(div.geom, geometry)
+        Rows Removed by Filter: 37078329
+Planning Time: 7.337 ms
+Execution Time: 121005.326 ms",121015.1,"count
+-----
+15547987",118650.9,"QUERY PLAN
+----------
+Nested Loop  (cost=21.37..41.92 rows=72 width=124) (actual time=121.724..65197.874 rows=15510932 loops=1)
+  CTE div
+    ->  Index Scan using divisions_pkey on divisions  (cost=0.43..20.95 rows=1 width=32) (actual time=121.269..121.273 rows=1 loops=1)
+          Index Cond: (id = '50a03a2c-3e24-4740-b80d-f933ea60c64f'::text)
+  ->  CTE Scan on div  (cost=0.00..0.02 rows=1 width=32) (actual time=121.278..121.283 rows=1 loops=1)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=0.439..64035.790 rows=15510932 loops=1)
+        Index Cond: ((geometry && div.geom) AND (geometry @ div.geom))
+        Filter: st_covers(div.geom, geometry)
+        Rows Removed by Filter: 37111863
+Planning Time: 11.142 ms
+Execution Time: 65528.220 ms",65540.7,"count
+-----
+15510932",62688.4,"QUERY PLAN
+----------
+Nested Loop  (cost=33.87..54.42 rows=72 width=124) (actual time=117.006..121776.562 rows=15547987 loops=1)
+  CTE div
+    ->  Index Scan using divisions_pkey on divisions  (cost=0.43..33.45 rows=1 width=32) (actual time=116.506..116.511 rows=1 loops=1)
+          Index Cond: (id = '50a03a2c-3e24-4740-b80d-f933ea60c64f'::text)
+  ->  CTE Scan on div  (cost=0.00..0.02 rows=1 width=32) (actual time=116.519..116.525 rows=1 loops=1)
+  ->  Index Scan using places_geometry_idx on places p  (cost=0.42..20.94 rows=1 width=92) (actual time=0.480..120582.826 rows=15547987 loops=1)
+        Index Cond: ((geometry && div.geom) AND (geometry @ div.geom))
+        Filter: st_covers(div.geom, geometry)
+        Rows Removed by Filter: 37078329
+Planning Time: 7.171 ms
+Execution Time: 122148.688 ms",122156.9,"count
+-----
+15547987",120455.6
