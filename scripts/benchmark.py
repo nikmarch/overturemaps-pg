@@ -112,9 +112,26 @@ def parse_column_names(sql: str, file_stem: str, num_stmts: int) -> list[str]:
     return cols
 
 
+def find_latest_results(results_dir: Path) -> Path | None:
+    """Find the most recent results CSV in the directory."""
+    files = sorted(results_dir.glob("results_*.csv"), key=lambda f: f.name, reverse=True)
+    return files[0] if files else None
+
+
+def load_completed_ids(results_file: Path) -> set[str]:
+    """Read IDs already present in a results CSV."""
+    completed = set()
+    with open(results_file) as f:
+        for row in csv.DictReader(f):
+            completed.add(row["id"])
+    return completed
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("folder", help="Folder with queries/ and results/ subdirectories")
+    parser.add_argument("--continue", dest="continue_run", action="store_true",
+                        help="Continue from the latest results file, skipping completed divisions")
     args = parser.parse_args()
 
     folder = Path(args.folder)
@@ -140,15 +157,35 @@ def main():
         header.extend(col_names)
 
     results_dir.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-    output_file = results_dir / f"results_{timestamp}.csv"
+
+    # Determine output file and completed IDs
+    completed_ids: set[str] = set()
+    if args.continue_run:
+        latest = find_latest_results(results_dir)
+        if latest and latest.stat().st_size > 0:
+            output_file = latest
+            completed_ids = load_completed_ids(latest)
+            print(f"Continuing {output_file.name} — {len(completed_ids)} divisions already done, "
+                  f"{len(config_items) - len(completed_ids)} remaining")
+        else:
+            print("No existing results to continue from, starting fresh")
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+            output_file = results_dir / f"results_{timestamp}.csv"
+    else:
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        output_file = results_dir / f"results_{timestamp}.csv"
 
     # Stream rows to CSV as each config completes
-    with open(output_file, "w", newline="") as f:
+    mode = "a" if completed_ids else "w"
+    with open(output_file, mode, newline="") as f:
         writer = csv.DictWriter(f, fieldnames=header)
-        writer.writeheader()
+        if not completed_ids:
+            writer.writeheader()
 
         for config in config_items:
+            if config["id"] in completed_ids:
+                print(f"## {config.get('name', config['id'])} — skipped (already done)")
+                continue
             name = config.get("name", config.get("id", "unknown"))
             print(f"## {name}")
             row = dict(config)
