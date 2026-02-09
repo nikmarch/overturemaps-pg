@@ -7,4 +7,4 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
-docker compose run --rm --build --user "$(id -u):$(id -g)" server python3 /app/scripts/generate_config.py "$1"
+docker compose run --rm --build server python3 /app/scripts/generate_config.py "$1"

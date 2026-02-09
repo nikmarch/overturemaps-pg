@@ -1,4 +1,4 @@
-id,osm_id,class,name,points,sqm
+id,osm_id,class,name,points,area
 d0d6962c-5bb5-459b-a2a0-9316e3e5e30a,r2186646,land,Antarctica,26008,4879.5305669429235
 ede685d8-d67e-48ff-8c05-e6e41a3227a0,r60189,maritime,Россия,165513,3232.9562361291364
 ac63467c-e698-452a-bce3-0729d2974a7e,r60189,land,Россия,209314,2923.7540096131793
