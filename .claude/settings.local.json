@@ -19,7 +19,12 @@
       "WebFetch(domain:duckdb.org)",
       "WebFetch(domain:docs.overturemaps.org)",
       "Bash(docker compose:*)",
-      "Bash(duckdb:*)"
+      "Bash(duckdb:*)",
+      "WebFetch(domain:dekart.xyz)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(docker run:*)",
+      "mcp__github__search_code",
+      "mcp__github__get_file_contents"
     ]
   }
 }

@@ -10,6 +10,7 @@ services:
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d
     command:
       - postgres
       - -c
@@ -37,5 +38,55 @@ services:
       PGPASSWORD: postgres
       PGDATABASE: overturemaps
 
+  minio:
+    image: minio/minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+
+  minio-init:
+    image: minio/mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 2;
+      mc alias set local http://minio:9000 minioadmin minioadmin;
+      mc mb --ignore-existing local/dekart;
+      exit 0;
+      "
+
+  dekart:
+    image: dekartxyz/dekart:0.19
+    restart: always
+    depends_on:
+      - db
+      - minio-init
+    ports:
+      - "8080:8080"
+    environment:
+      DEKART_POSTGRES_DB: dekart
+      DEKART_POSTGRES_USER: postgres
+      DEKART_POSTGRES_PASSWORD: postgres
+      DEKART_POSTGRES_PORT: 5432
+      DEKART_POSTGRES_HOST: db
+      DEKART_DATASOURCE: PG
+      DEKART_POSTGRES_SSLMODE: disable
+      DEKART_POSTGRES_DATASOURCE_CONNECTION: postgres://postgres:postgres@db:5432/overturemaps?sslmode=disable
+      DEKART_MAPBOX_TOKEN: "${DEKART_MAPBOX_TOKEN}"
+      DEKART_STORAGE: S3
+      DEKART_CLOUD_STORAGE_BUCKET: dekart
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      AWS_ENDPOINT: http://minio:9000
+
 volumes:
   pgdata:
+  minio-data:
