@@ -39,6 +39,20 @@ docker compose exec db psql -U postgres -d overturemaps
 
 Connection: `postgres://postgres:postgres@localhost:5432/overturemaps`
 
+## PostGIS + H3
+
+The `db` container is PostGIS plus the `h3` PostgreSQL extension (via `h3-pg`).
+
+### Notes about existing volumes
+
+Extensions are created automatically only on **first init** (fresh `pgdata` volume) via `/docker-entrypoint-initdb.d/00_extensions.sql`.
+
+If you already have an existing `pgdata` volume, run this once:
+
+```bash
+docker compose exec -T db psql -U postgres -d overturemaps -c "CREATE EXTENSION IF NOT EXISTS h3;"
+```
+
 ## Tables
 
 | Table | Columns | Source |

@@ -1,6 +1,9 @@
 services:
   db:
-    image: postgis/postgis:17-3.5
+    build:
+      context: ./db
+      dockerfile: Dockerfile
+    image: overturemaps-postgis-h3:17-3.5
     platform: linux/amd64
     environment:
       POSTGRES_USER: postgres
