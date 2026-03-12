@@ -8,29 +8,35 @@
 --   SELECT cell, res, place_count FROM places_h3_adaptive;
 --
 -- Run:
---   docker compose exec -T db psql -U postgres -d overturemaps \
---     -v threshold=10000 \
---     < experiments/h3_places_materialized_views.sql
+--   ./build_views.sh                # default threshold=10000
+--   ./build_views.sh 5000           # custom threshold
 
 DROP MATERIALIZED VIEW IF EXISTS places_h3_adaptive;
 
 CREATE MATERIALIZED VIEW places_h3_adaptive AS
 WITH
+-- Compute r10 once, derive all coarser resolutions via h3_cell_to_parent
+-- to guarantee strict nesting (children always sum to parent count)
 base AS (
   SELECT
-    h3_latlng_to_cell(p.geometry::point, 1)  AS h3_r1,
-    h3_latlng_to_cell(p.geometry::point, 2)  AS h3_r2,
-    h3_latlng_to_cell(p.geometry::point, 3)  AS h3_r3,
-    h3_latlng_to_cell(p.geometry::point, 4)  AS h3_r4,
-    h3_latlng_to_cell(p.geometry::point, 5)  AS h3_r5,
-    h3_latlng_to_cell(p.geometry::point, 6)  AS h3_r6,
-    h3_latlng_to_cell(p.geometry::point, 7)  AS h3_r7,
-    h3_latlng_to_cell(p.geometry::point, 8)  AS h3_r8,
-    h3_latlng_to_cell(p.geometry::point, 9)  AS h3_r9,
-    h3_latlng_to_cell(p.geometry::point, 10) AS h3_r10,
-    COUNT(*)::bigint AS place_count
-  FROM places p
-  GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+    h3_r10,
+    h3_cell_to_parent(h3_r10, 9)  AS h3_r9,
+    h3_cell_to_parent(h3_r10, 8)  AS h3_r8,
+    h3_cell_to_parent(h3_r10, 7)  AS h3_r7,
+    h3_cell_to_parent(h3_r10, 6)  AS h3_r6,
+    h3_cell_to_parent(h3_r10, 5)  AS h3_r5,
+    h3_cell_to_parent(h3_r10, 4)  AS h3_r4,
+    h3_cell_to_parent(h3_r10, 3)  AS h3_r3,
+    h3_cell_to_parent(h3_r10, 2)  AS h3_r2,
+    h3_cell_to_parent(h3_r10, 1)  AS h3_r1,
+    place_count
+  FROM (
+    SELECT
+      h3_latlng_to_cell(p.geometry::point, 10) AS h3_r10,
+      COUNT(*)::bigint AS place_count
+    FROM places p
+    GROUP BY 1
+  ) r10
 ),
 -- Count places per cell at each resolution
 c1  AS (SELECT h3_r1  AS cell, SUM(place_count)::bigint AS cnt FROM base GROUP BY 1),
