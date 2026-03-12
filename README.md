@@ -37,7 +37,7 @@ Without `--drop`, import is skipped if the table already exists.
 docker compose exec db psql -U postgres -d overturemaps
 ```
 
-Connection: `postgres://postgres:postgres@localhost:5432/overturemaps`
+Connection: `postgres://postgres:postgres@localhost:5434/overturemaps`
 
 ## PostGIS + H3
 
