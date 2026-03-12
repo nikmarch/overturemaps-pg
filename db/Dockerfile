@@ -13,12 +13,14 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 # Build + install h3-pg (includes the h3 library)
-# Pin to v4.2.2 for reproducibility.
+# Pin to release 4.2.3 commit for reproducibility.
 # Use cmake directly to skip the pgindent formatting target (broken on PG17).
-RUN git clone --branch v4.2.2 --depth 1 https://github.com/zachasme/h3-pg.git /tmp/h3-pg \
+RUN git clone https://github.com/zachasme/h3-pg.git /tmp/h3-pg \
   && cd /tmp/h3-pg \
-  && cmake -B build -DCMAKE_BUILD_TYPE=Release -DSKIP_FORMAT=ON \
-  && cmake --build build --target h3 --target postgresql_h3_shared \
+  && git checkout a26630b8 \
+  && rm -f /usr/lib/postgresql/17/bin/pgindent \
+  && cmake -B build -DCMAKE_BUILD_TYPE=Release \
+  && cmake --build build \
   && cmake --install build --component h3-pg \
   && rm -rf /tmp/h3-pg
 
