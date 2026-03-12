@@ -44,12 +44,30 @@ BEGIN
 END;
 $$;
 
--- One query (CTEs) you can run after creating the MV above:
+-- Query #1: simple rollup
+-- "How many places are inside each H3 cell at resolution N?"
+--
+-- Example (set N=9):
+--
+--   SELECT
+--     h3_parent(h3_r10, 9) AS h3_r9,
+--     SUM(place_count)::bigint AS place_count
+--   FROM places_h3_r10_counts
+--   GROUP BY 1
+--   ORDER BY place_count DESC;
+--
+-- Query #2: adaptive frontier (mixed resolutions)
+-- Returns a set of (res, cell, place_count) such that each returned cell:
+--   - has place_count <= :threshold
+--   - but its parent would exceed :threshold (so this is the coarsest safe bucket)
+--   - or it is already at res=1
 --
 -- WITH RECURSIVE counts AS (
 --   SELECT 10 AS res, h3_r10 AS cell, place_count AS cnt
 --   FROM places_h3_r10_counts
+--
 --   UNION ALL
+--
 --   SELECT c.res - 1 AS res, h3_parent(c.cell, c.res - 1) AS cell, SUM(c.cnt)::bigint AS cnt
 --   FROM counts c
 --   WHERE c.res > 1
