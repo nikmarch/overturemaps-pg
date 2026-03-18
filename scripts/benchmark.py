@@ -75,15 +75,17 @@ def run_query(sql: str) -> tuple[float, str]:
         cur.execute(sql)
         elapsed_ms = (time.perf_counter() - start) * 1000
 
-        # Format output similar to psql
+        # Format output as compact single-line (readable in GitHub CSV viewer)
         if cur.description:
             rows = cur.fetchall()
             col_names = [desc[0] for desc in cur.description]
-            output_lines = [" | ".join(col_names)]
-            output_lines.append("-+-".join("-" * len(name) for name in col_names))
-            for row in rows:
-                output_lines.append(" | ".join(str(val) for val in row))
-            output = "\n".join(output_lines)
+            if len(rows) == 1:
+                output = ", ".join(f"{k}={v}" for k, v in zip(col_names, rows[0]))
+            else:
+                row_strs = []
+                for row in rows:
+                    row_strs.append(", ".join(f"{k}={v}" for k, v in zip(col_names, row)))
+                output = " | ".join(row_strs)
         else:
             output = ""
 
@@ -129,19 +131,18 @@ def load_completed_ids(results_file: Path) -> set[str]:
 
 
 def format_as_md_table(output: str) -> str:
-    """Convert psql-style output to a markdown table."""
+    """Convert compact key=val output to a markdown table."""
     if not output.strip():
         return "_no output_"
-    lines = output.strip().split("\n")
-    if len(lines) < 2:
-        return f"`{output.strip()}`"
-    # First line is headers, second is separator
-    headers = [h.strip() for h in lines[0].split("|")]
+    rows = output.split(" | ")
+    # Parse key=val pairs from first row to get headers
+    first_pairs = [p.split("=", 1) for p in rows[0].split(", ")]
+    headers = [p[0] for p in first_pairs]
     md_lines = ["| " + " | ".join(headers) + " |"]
     md_lines.append("| " + " | ".join("---" for _ in headers) + " |")
-    for line in lines[2:]:
-        cols = [c.strip() for c in line.split("|")]
-        md_lines.append("| " + " | ".join(cols) + " |")
+    for row_str in rows:
+        vals = [p.split("=", 1)[1] if "=" in p else p for p in row_str.split(", ")]
+        md_lines.append("| " + " | ".join(vals) + " |")
     return "\n".join(md_lines)
 
 
