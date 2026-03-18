@@ -1,0 +1,9 @@
+-- columns: gini
+SELECT
+  round((sum(cumulative_share) * 2.0 / count(*) - 1)::numeric, 4) AS gini
+FROM (
+  SELECT place_count,
+    sum(place_count) OVER (ORDER BY place_count) * 1.0
+      / sum(place_count) OVER () AS cumulative_share
+  FROM places_h3_t{threshold}
+) g
