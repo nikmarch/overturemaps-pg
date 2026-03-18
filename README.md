@@ -54,21 +54,6 @@ docker compose exec -T db psql -U postgres -d overturemaps -c "CREATE EXTENSION 
 docker compose exec -T db psql -U postgres -d overturemaps -c "CREATE EXTENSION IF NOT EXISTS h3_postgis CASCADE;"
 ```
 
-### H3 Adaptive Materialized View
-
-Build an adaptive-resolution view that clusters places into H3 cells — coarse where sparse, fine where dense:
-
-```bash
-./build_h3_views.sh          # default threshold=10000
-./build_h3_views.sh 5000     # finer detail
-```
-
-Then query:
-
-```sql
-SELECT cell, res, place_count FROM places_h3_adaptive;
-```
-
 ## Benchmarks
 
 Run parameterized query benchmarks against pages:
