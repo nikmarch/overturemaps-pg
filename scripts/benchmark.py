@@ -68,15 +68,16 @@ def restart_db():
 def run_query(sql: str) -> tuple[float, str]:
     """Run SQL via psycopg2 and return (time_ms, output)."""
     conn = get_db_connection()
+    conn.autocommit = True
     try:
         cur = conn.cursor()
         start = time.perf_counter()
         cur.execute(sql)
-        rows = cur.fetchall()
         elapsed_ms = (time.perf_counter() - start) * 1000
 
         # Format output similar to psql
         if cur.description:
+            rows = cur.fetchall()
             col_names = [desc[0] for desc in cur.description]
             output_lines = [" | ".join(col_names)]
             output_lines.append("-+-".join("-" * len(name) for name in col_names))

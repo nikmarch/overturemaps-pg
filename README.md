@@ -51,7 +51,40 @@ If you already have an existing `pgdata` volume, run this once:
 
 ```bash
 docker compose exec -T db psql -U postgres -d overturemaps -c "CREATE EXTENSION IF NOT EXISTS h3;"
+docker compose exec -T db psql -U postgres -d overturemaps -c "CREATE EXTENSION IF NOT EXISTS h3_postgis CASCADE;"
 ```
+
+### H3 Adaptive Materialized View
+
+Build an adaptive-resolution view that clusters places into H3 cells — coarse where sparse, fine where dense:
+
+```bash
+./build_h3_views.sh          # default threshold=10000
+./build_h3_views.sh 5000     # finer detail
+```
+
+Then query:
+
+```sql
+SELECT cell, res, place_count FROM places_h3_adaptive;
+```
+
+## Benchmarks
+
+Run parameterized query benchmarks against pages:
+
+```bash
+# 1. Generate config (test cases)
+./generate_config.sh pages/h3-adaptive-clustering
+
+# 2. Run benchmarks
+./benchmark.sh pages/h3-adaptive-clustering
+
+# 3. Resume if interrupted
+./benchmark.sh pages/h3-adaptive-clustering --continue
+```
+
+Results are saved to `pages/<page>/results/`.
 
 ## Tables
 
