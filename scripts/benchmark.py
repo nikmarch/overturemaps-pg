@@ -75,17 +75,20 @@ def run_query(sql: str) -> tuple[float, str]:
         cur.execute(sql)
         elapsed_ms = (time.perf_counter() - start) * 1000
 
-        # Format output as compact single-line (readable in GitHub CSV viewer)
+        # Format output as psql-style bordered table
         if cur.description:
             rows = cur.fetchall()
             col_names = [desc[0] for desc in cur.description]
-            if len(rows) == 1:
-                output = ", ".join(f"{k}={v}" for k, v in zip(col_names, rows[0]))
-            else:
-                row_strs = []
-                for row in rows:
-                    row_strs.append(", ".join(f"{k}={v}" for k, v in zip(col_names, row)))
-                output = " | ".join(row_strs)
+            str_rows = [[str(val) for val in row] for row in rows]
+            widths = [max(len(name), *(len(r[i]) for r in str_rows))
+                      for i, name in enumerate(col_names)]
+            sep = "+" + "+".join("-" * (w + 2) for w in widths) + "+"
+            header = "|" + "|".join(f" {name:<{w}} " for name, w in zip(col_names, widths)) + "|"
+            lines = [sep, header, sep]
+            for row in str_rows:
+                lines.append("|" + "|".join(f" {val:<{w}} " for val, w in zip(row, widths)) + "|")
+            lines.append(sep)
+            output = "\n".join(lines)
         else:
             output = ""
 
@@ -131,18 +134,18 @@ def load_completed_ids(results_file: Path) -> set[str]:
 
 
 def format_as_md_table(output: str) -> str:
-    """Convert compact key=val output to a markdown table."""
+    """Convert psql bordered table to a markdown table."""
     if not output.strip():
         return "_no output_"
-    rows = output.split(" | ")
-    # Parse key=val pairs from first row to get headers
-    first_pairs = [p.split("=", 1) for p in rows[0].split(", ")]
-    headers = [p[0] for p in first_pairs]
+    lines = [l for l in output.strip().split("\n") if not l.startswith("+")]
+    if not lines:
+        return f"`{output.strip()}`"
+    parsed = [[c.strip() for c in line.strip("|").split("|")] for line in lines]
+    headers = parsed[0]
     md_lines = ["| " + " | ".join(headers) + " |"]
     md_lines.append("| " + " | ".join("---" for _ in headers) + " |")
-    for row_str in rows:
-        vals = [p.split("=", 1)[1] if "=" in p else p for p in row_str.split(", ")]
-        md_lines.append("| " + " | ".join(vals) + " |")
+    for row in parsed[1:]:
+        md_lines.append("| " + " | ".join(row) + " |")
     return "\n".join(md_lines)
 
 
