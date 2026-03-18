@@ -128,6 +128,53 @@ def load_completed_ids(results_file: Path) -> set[str]:
     return completed
 
 
+def format_as_md_table(output: str) -> str:
+    """Convert psql-style output to a markdown table."""
+    if not output.strip():
+        return "_no output_"
+    lines = output.strip().split("\n")
+    if len(lines) < 2:
+        return f"`{output.strip()}`"
+    # First line is headers, second is separator
+    headers = [h.strip() for h in lines[0].split("|")]
+    md_lines = ["| " + " | ".join(headers) + " |"]
+    md_lines.append("| " + " | ".join("---" for _ in headers) + " |")
+    for line in lines[2:]:
+        cols = [c.strip() for c in line.split("|")]
+        md_lines.append("| " + " | ".join(cols) + " |")
+    return "\n".join(md_lines)
+
+
+def write_markdown_report(output_file: Path, config_items: list[dict],
+                          sql_contents: dict, results: dict[str, dict]):
+    """Write a human-readable markdown report alongside the CSV."""
+    md_file = output_file.with_suffix(".md")
+    with open(md_file, "w") as f:
+        f.write(f"# Benchmark Results\n\n")
+        f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+
+        for config in config_items:
+            config_id = config["id"]
+            if config_id not in results:
+                continue
+            row = results[config_id]
+            name = config.get("name", config_id)
+            f.write(f"## {name}\n\n")
+
+            for sql_file, (_, _, col_names) in sql_contents.items():
+                for i in range(0, len(col_names), 2):
+                    result_col = col_names[i]
+                    time_col = col_names[i + 1]
+                    output = row.get(result_col, "")
+                    elapsed = row.get(time_col, "")
+                    # Use the column name part after the file stem
+                    label = result_col.split("_", 2)[-1] if "_" in result_col else result_col
+                    f.write(f"### {label} ({elapsed}ms)\n\n")
+                    f.write(format_as_md_table(output) + "\n\n")
+
+    print(f"Report: {md_file}")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("folder", help="Folder with queries/ and results/ subdirectories")
@@ -177,6 +224,7 @@ def main():
         output_file = results_dir / f"results_{timestamp}.csv"
 
     # Stream rows to CSV as each config completes
+    all_results: dict[str, dict] = {}
     mode = "a" if completed_ids else "w"
     with open(output_file, mode, newline="") as f:
         writer = csv.DictWriter(f, fieldnames=header)
@@ -216,8 +264,10 @@ def main():
 
             writer.writerow(row)
             f.flush()
+            all_results[config["id"]] = row
 
     print(f"Done! Saved to {output_file}")
+    write_markdown_report(output_file, config_items, sql_contents, all_results)
 
 
 if __name__ == "__main__":
