@@ -8,6 +8,6 @@ SELECT res,
   count(*) AS cells,
   sum(place_count) AS places,
   round(sum(h3_cell_area(cell, 'km^2'))::numeric) AS total_area_km2,
-  round(100.0 * sum(h3_cell_area(cell, 'km^2')) / 510e6, 2) AS pct_earth
+  round((100.0 * sum(h3_cell_area(cell, 'km^2')) / 510e6)::numeric, 2) AS pct_earth
 FROM places_h3_t{threshold}
 GROUP BY res ORDER BY res
