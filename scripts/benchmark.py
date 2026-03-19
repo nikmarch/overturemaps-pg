@@ -19,11 +19,13 @@ Expects:
     <page-folder>/queries/*.sql
 
 Writes results to:
-    <page-folder>/results/results_<timestamp>.csv
+    <page-folder>/results/results_<timestamp>.csv   (JSON in cells, DuckDB-friendly)
+    <page-folder>/results/results_<timestamp>.md    (human-readable tables)
 """
 
 import argparse
 import csv
+import json
 import subprocess
 import time
 from datetime import datetime
@@ -65,8 +67,8 @@ def restart_db():
     print("ready.", end=" ", flush=True)
 
 
-def run_query(sql: str) -> tuple[float, str]:
-    """Run SQL via psycopg2 and return (time_ms, output)."""
+def run_query(sql: str) -> tuple[float, list[dict]]:
+    """Run SQL via psycopg2 and return (time_ms, rows_as_dicts)."""
     conn = get_db_connection()
     conn.autocommit = True
     try:
@@ -75,26 +77,35 @@ def run_query(sql: str) -> tuple[float, str]:
         cur.execute(sql)
         elapsed_ms = (time.perf_counter() - start) * 1000
 
-        # Format output as psql-style bordered table
         if cur.description:
-            rows = cur.fetchall()
             col_names = [desc[0] for desc in cur.description]
-            str_rows = [[str(val) for val in row] for row in rows]
-            widths = [max(len(name), *(len(r[i]) for r in str_rows))
-                      for i, name in enumerate(col_names)]
-            sep = "+" + "+".join("-" * (w + 2) for w in widths) + "+"
-            header = "|" + "|".join(f" {name:<{w}} " for name, w in zip(col_names, widths)) + "|"
-            lines = [sep, header, sep]
-            for row in str_rows:
-                lines.append("|" + "|".join(f" {val:<{w}} " for val, w in zip(row, widths)) + "|")
-            lines.append(sep)
-            output = "\n".join(lines)
+            rows = [dict(zip(col_names, (str(v) for v in row))) for row in cur.fetchall()]
         else:
-            output = ""
+            rows = []
 
-        return elapsed_ms, output
+        return elapsed_ms, rows
     finally:
         conn.close()
+
+
+def rows_to_json(rows: list[dict]) -> str:
+    """Format rows as JSON for CSV cells."""
+    if not rows:
+        return ""
+    return json.dumps(rows, ensure_ascii=False)
+
+
+def rows_to_md_table(rows: list[dict]) -> str:
+    """Format rows as a markdown table."""
+    if not rows:
+        return "_no output_"
+    headers = list(rows[0].keys())
+    widths = [max(len(h), *(len(str(r.get(h, ""))) for r in rows)) for h in headers]
+    lines = ["| " + " | ".join(f"{h:<{w}}" for h, w in zip(headers, widths)) + " |"]
+    lines.append("| " + " | ".join("-" * w for w in widths) + " |")
+    for row in rows:
+        lines.append("| " + " | ".join(f"{str(row.get(h, '')):<{w}}" for h, w in zip(headers, widths)) + " |")
+    return "\n".join(lines)
 
 
 def split_sql_statements(sql: str) -> list[str]:
@@ -133,28 +144,12 @@ def load_completed_ids(results_file: Path) -> set[str]:
     return completed
 
 
-def format_as_md_table(output: str) -> str:
-    """Convert psql bordered table to a markdown table."""
-    if not output.strip():
-        return "_no output_"
-    lines = [l for l in output.strip().split("\n") if not l.startswith("+")]
-    if not lines:
-        return f"`{output.strip()}`"
-    parsed = [[c.strip() for c in line.strip("|").split("|")] for line in lines]
-    headers = parsed[0]
-    md_lines = ["| " + " | ".join(headers) + " |"]
-    md_lines.append("| " + " | ".join("---" for _ in headers) + " |")
-    for row in parsed[1:]:
-        md_lines.append("| " + " | ".join(row) + " |")
-    return "\n".join(md_lines)
-
-
 def write_markdown_report(output_file: Path, config_items: list[dict],
                           sql_contents: dict, results: dict[str, dict]):
     """Write a human-readable markdown report alongside the CSV."""
     md_file = output_file.with_suffix(".md")
     with open(md_file, "w") as f:
-        f.write(f"# Benchmark Results\n\n")
+        f.write("# Benchmark Results\n\n")
         f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
 
         for config in config_items:
@@ -169,12 +164,18 @@ def write_markdown_report(output_file: Path, config_items: list[dict],
                 for i in range(0, len(col_names), 2):
                     result_col = col_names[i]
                     time_col = col_names[i + 1]
-                    output = row.get(result_col, "")
+                    rows_json = row.get(result_col, "")
                     elapsed = row.get(time_col, "")
-                    # Use the column name part after the file stem
                     label = result_col.split("_", 2)[-1] if "_" in result_col else result_col
                     f.write(f"### {label} ({elapsed}ms)\n\n")
-                    f.write(format_as_md_table(output) + "\n\n")
+                    if rows_json:
+                        try:
+                            rows_data = json.loads(rows_json)
+                            f.write(rows_to_md_table(rows_data) + "\n\n")
+                        except (json.JSONDecodeError, TypeError):
+                            f.write(f"`{rows_json}`\n\n")
+                    else:
+                        f.write("_no output_\n\n")
 
     print(f"Report: {md_file}")
 
@@ -257,11 +258,11 @@ def main():
                 restart_db()
 
                 for i, stmt in enumerate(statements):
-                    elapsed_ms, output = run_query(stmt)
+                    elapsed_ms, rows_data = run_query(stmt)
                     result_col = col_names[i * 2]
                     time_col = col_names[i * 2 + 1]
                     print(f"{result_col}={elapsed_ms:.1f}ms ", end="", flush=True)
-                    row[result_col] = output
+                    row[result_col] = rows_to_json(rows_data)
                     row[time_col] = f"{elapsed_ms:.1f}"
 
                 print()
