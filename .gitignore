@@ -1,0 +1,5 @@
+.env
+Session.vim
+__pycache__/
+*.pyc
+pages/**/results/*.csv
