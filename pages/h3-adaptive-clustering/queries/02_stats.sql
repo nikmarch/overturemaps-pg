@@ -25,7 +25,6 @@ SELECT
   round(avg(place_count)) AS avg,
   round(stddev(place_count)) AS stddev,
   min(place_count) AS min,
-  (percentile_cont(ARRAY[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]) WITHIN GROUP (ORDER BY place_count))::int[] AS percentiles,
   max(place_count) AS max,
   count(*) FILTER (WHERE place_count = 1) AS single_place_cells
 FROM places_h3_t{threshold}
