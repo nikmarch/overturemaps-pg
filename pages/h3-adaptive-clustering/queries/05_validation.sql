@@ -1,9 +1,11 @@
--- description: Overlap validation. Checks that no cell in the MV is an ancestor of another — overlapping_pairs should be 0 for a correct adaptive frontier.
+-- description: Spatial overlap validation. Converts cells to polygons and checks that no cell contains another. overlapping_pairs should be 0.
 -- columns: overlapping_cells
+WITH cells AS (
+  SELECT cell, res, place_count,
+    h3_cell_to_boundary_geometry(cell) AS geom
+  FROM places_h3_t{threshold}
+)
 SELECT count(*) AS overlapping_pairs
-FROM (
-  SELECT c.cell, h3_cell_to_parent(c.cell, gs) AS parent_cell
-  FROM places_h3_t{threshold} c
-  CROSS JOIN generate_series(1, c.res - 1) AS gs
-) parents
-JOIN places_h3_t{threshold} mv ON mv.cell = parents.parent_cell
+FROM cells a
+JOIN cells b ON a.res < b.res
+  AND ST_Contains(a.geom, b.geom)
