@@ -1,7 +1,18 @@
--- description: Validates that places assigned to a cell by H3 index at that resolution actually fall within the cell boundary. mismatched_places should be 0.
--- columns: mismatched_places
-SELECT count(*) AS mismatched_places
+-- description: Two validations. 1) Check no cell contains another (ancestor overlap). 2) Check a place assigned by H3 index actually falls within its cell boundary — returns the first mismatch or empty.
+-- columns: overlapping_cells, boundary_mismatch
+SELECT count(*) AS overlapping_pairs
+FROM (
+  SELECT c.cell, h3_cell_to_parent(c.cell, gs) AS parent_cell
+  FROM places_h3_t{threshold} c
+  CROSS JOIN generate_series(1, c.res - 1) AS gs
+) parents
+JOIN places_h3_t{threshold} mv ON mv.cell = parents.parent_cell;
+
+SELECT c.cell, c.res, c.place_count,
+  h3_cell_to_lat_lng(c.cell) AS cell_center,
+  p.geometry::text AS place_geom
 FROM places_h3_t{threshold} c
 JOIN places p
   ON h3_latlng_to_cell(p.geometry::point, c.res) = c.cell
 WHERE NOT ST_Intersects(p.geometry::geometry, h3_cell_to_boundary_geometry(c.cell))
+LIMIT 1
