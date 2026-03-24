@@ -23,6 +23,19 @@ SETUP = f"""
 """
 
 
+def get_latest_release(con):
+    """Find the latest Overture Maps release from S3."""
+    rows = con.execute("""
+        SELECT replace(file, 's3://overturemaps-us-west-2/release/', '') AS release
+        FROM glob('s3://overturemaps-us-west-2/release/*/theme=places/type=place/*')
+        LIMIT 1
+    """).fetchone()
+    if not rows:
+        raise RuntimeError("Could not find any Overture Maps release on S3")
+    # Extract release version from path like "2026-01-21.0/theme=places/type=place/..."
+    return rows[0].split("/")[0]
+
+
 def execute_sql(con, sql, drop=False):
     for statement in sql.split(";"):
         statement = statement.strip()
@@ -57,6 +70,9 @@ def main():
     con = duckdb.connect()
     execute_sql(con, SETUP)
 
+    release = get_latest_release(con)
+    print(f"Using Overture Maps release: {release}")
+
     for sql_path in sql_files:
         table = sql_path.stem
 
@@ -65,7 +81,8 @@ def main():
             continue
 
         print(f"Running {sql_path.name}...")
-        execute_sql(con, sql_path.read_text(), drop=drop)
+        sql = sql_path.read_text().replace("{release}", release)
+        execute_sql(con, sql, drop=drop)
         print(f"Done {sql_path.name}")
 
     con.close()

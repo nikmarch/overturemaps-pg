@@ -96,7 +96,7 @@ CALL postgres_execute('pg', '
 
 INSERT INTO pg.public.mytable (id, geography)
 SELECT id, geometry
-FROM read_parquet('s3://overturemaps-us-west-2/release/2026-01-21.0/theme=...');
+FROM read_parquet('s3://overturemaps-us-west-2/release/{release}/theme=...');
 
 CALL postgres_execute('pg', 'CREATE INDEX IF NOT EXISTS mytable_geography_idx ON mytable USING GIST (geography)')
 ```

@@ -18,7 +18,7 @@ SELECT
     names.primary,
     class
 FROM
-    read_parquet('s3://overturemaps-us-west-2/release/2026-01-21.0/theme=divisions/type=division_area/*');
+    read_parquet('s3://overturemaps-us-west-2/release/{release}/theme=divisions/type=division_area/*');
 
 CALL postgres_execute(
     'pg',
