@@ -1,4 +1,4 @@
-CALL postgres_execute('pg', 'DROP TABLE IF EXISTS places');
+CALL postgres_execute('pg', 'DROP TABLE IF EXISTS places CASCADE');
 
 CALL postgres_execute('pg', '
     CREATE TABLE IF NOT EXISTS places (

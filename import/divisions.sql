@@ -1,4 +1,4 @@
-CALL postgres_execute('pg', 'DROP TABLE IF EXISTS divisions');
+CALL postgres_execute('pg', 'DROP TABLE IF EXISTS divisions CASCADE');
 
 CALL postgres_execute('pg', '
     CREATE TABLE IF NOT EXISTS divisions (
