@@ -113,10 +113,24 @@ def split_sql_statements(sql: str) -> list[str]:
     return [s.strip() for s in sql.split(";") if s.strip()]
 
 
+def parse_description(sql: str) -> str:
+    """Extract description from a `-- description:` comment."""
+    for line in sql.split("\n"):
+        line = line.strip()
+        if line.startswith("-- description:"):
+            return line.split(":", 1)[1].strip()
+    return ""
+
+
 def parse_column_names(sql: str, file_stem: str, num_stmts: int) -> list[str]:
-    """Parse column names from a `-- columns:` comment on the first line."""
-    first_line = sql.split("\n", 1)[0].strip()
-    if first_line.startswith("-- columns:"):
+    """Parse column names from a `-- columns:` comment."""
+    first_line = None
+    for line in sql.split("\n"):
+        line = line.strip()
+        if line.startswith("-- columns:"):
+            first_line = line
+            break
+    if first_line and first_line.startswith("-- columns:"):
         names = [n.strip() for n in first_line.split(":", 1)[1].split(",")]
     else:
         names = [f"s{i}" for i in range(1, num_stmts + 1)]
@@ -160,7 +174,9 @@ def write_markdown_report(output_file: Path, config_items: list[dict],
             name = config.get("name", config_id)
             f.write(f"## {name}\n\n")
 
-            for sql_file, (_, _, col_names) in sql_contents.items():
+            for sql_file, (_, _, col_names, description) in sql_contents.items():
+                if description:
+                    f.write(f"**{sql_file.stem}**: {description}\n\n")
                 for i in range(0, len(col_names), 2):
                     result_col = col_names[i]
                     time_col = col_names[i + 1]
@@ -206,7 +222,8 @@ def main():
         raw_sql = sql_file.read_text().strip()
         stmts = split_sql_statements(raw_sql)
         col_names = parse_column_names(raw_sql, sql_file.stem, len(stmts))
-        sql_contents[sql_file] = (raw_sql, stmts, col_names)
+        description = parse_description(raw_sql)
+        sql_contents[sql_file] = (raw_sql, stmts, col_names, description)
         header.extend(col_names)
 
     results_dir.mkdir(parents=True, exist_ok=True)
@@ -245,7 +262,7 @@ def main():
             row = dict(config)
 
             for sql_file in sql_files:
-                raw_sql, _stmts_template, col_names = sql_contents[sql_file]
+                raw_sql, _stmts_template, col_names, _ = sql_contents[sql_file]
 
                 # Substitute {key} placeholders
                 rendered = raw_sql

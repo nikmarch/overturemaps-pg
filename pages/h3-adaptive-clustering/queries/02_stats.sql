@@ -1,3 +1,4 @@
+-- description: Distribution stats. Resolution breakdown (cells, places, avg/min/max per cell), decile distribution via ntile(10), and totals with percentile array.
 -- columns: by_resolution, deciles, totals
 SELECT res, count(*) AS cells, sum(place_count) AS places,
   round(avg(place_count)) AS avg_per_cell,

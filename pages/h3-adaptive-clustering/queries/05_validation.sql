@@ -1,3 +1,4 @@
+-- description: Overlap validation. Checks that no cell in the MV is an ancestor of another — overlapping_pairs should be 0 for a correct adaptive frontier.
 -- columns: overlapping_cells
 SELECT count(*) AS overlapping_pairs
 FROM (

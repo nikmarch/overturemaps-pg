@@ -1,3 +1,4 @@
+-- description: Gini coefficient measuring how evenly places are distributed across cells. 0 = perfectly uniform, 1 = all places in one cell.
 -- columns: gini
 SELECT
   round((sum(cumulative_share) * 2.0 / count(*) - 1)::numeric, 4) AS gini

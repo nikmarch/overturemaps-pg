@@ -1,3 +1,4 @@
+-- description: Create adaptive H3 materialized view. Each place is assigned to the coarsest resolution where its cell count stays under the threshold. Strict hierarchy via h3_cell_to_parent.
 -- columns: drop, create_view, count
 DROP MATERIALIZED VIEW IF EXISTS places_h3_t{threshold};
 

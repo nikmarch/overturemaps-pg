@@ -1,3 +1,4 @@
+-- description: Geographic analysis. Top 20 densest cells with lat/lng coordinates, and area coverage per resolution as percentage of Earth's surface.
 -- columns: top_dense, area_coverage
 SELECT cell, res, place_count,
   h3_cell_to_lat_lng(cell) AS center
