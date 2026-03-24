@@ -25,15 +25,16 @@ SETUP = f"""
 
 def get_latest_release(con):
     """Find the latest Overture Maps release from S3."""
-    rows = con.execute("""
-        SELECT replace(file, 's3://overturemaps-us-west-2/release/', '') AS release
+    row = con.execute("""
+        SELECT split_part(replace(file, 's3://overturemaps-us-west-2/release/', ''), '/', 1) AS release
         FROM glob('s3://overturemaps-us-west-2/release/*/theme=places/type=place/*')
+        GROUP BY 1
+        ORDER BY 1 DESC
         LIMIT 1
     """).fetchone()
-    if not rows:
+    if not row:
         raise RuntimeError("Could not find any Overture Maps release on S3")
-    # Extract release version from path like "2026-01-21.0/theme=places/type=place/..."
-    return rows[0].split("/")[0]
+    return row[0]
 
 
 def execute_sql(con, sql, drop=False):
