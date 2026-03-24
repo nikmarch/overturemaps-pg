@@ -25,7 +25,6 @@ Writes results to:
 
 import argparse
 import csv
-import json
 import subprocess
 import time
 from datetime import datetime
@@ -67,8 +66,8 @@ def restart_db():
     print("ready.", end=" ", flush=True)
 
 
-def run_query(sql: str) -> tuple[float, list[dict]]:
-    """Run SQL via psycopg2 and return (time_ms, rows_as_dicts)."""
+def run_query(sql: str) -> tuple[float, str]:
+    """Run SQL via psycopg2 and return (time_ms, output)."""
     conn = get_db_connection()
     conn.autocommit = True
     try:
@@ -77,35 +76,37 @@ def run_query(sql: str) -> tuple[float, list[dict]]:
         cur.execute(sql)
         elapsed_ms = (time.perf_counter() - start) * 1000
 
+        # Format output similar to psql
         if cur.description:
+            rows = cur.fetchall()
             col_names = [desc[0] for desc in cur.description]
-            rows = [dict(zip(col_names, (str(v) for v in row))) for row in cur.fetchall()]
+            output_lines = [" | ".join(col_names)]
+            output_lines.append("-+-".join("-" * len(name) for name in col_names))
+            for row in rows:
+                output_lines.append(" | ".join(str(val) for val in row))
+            output = "\n".join(output_lines)
         else:
-            rows = []
+            output = ""
 
-        return elapsed_ms, rows
+        return elapsed_ms, output
     finally:
         conn.close()
 
 
-def rows_to_json(rows: list[dict]) -> str:
-    """Format rows as JSON for CSV cells."""
-    if not rows:
-        return ""
-    return json.dumps(rows, ensure_ascii=False)
-
-
-def rows_to_md_table(rows: list[dict]) -> str:
-    """Format rows as a markdown table."""
-    if not rows:
+def output_to_md_table(output: str) -> str:
+    """Convert psql-style output to a markdown table."""
+    if not output.strip():
         return "_no output_"
-    headers = list(rows[0].keys())
-    widths = [max(len(h), *(len(str(r.get(h, ""))) for r in rows)) for h in headers]
-    lines = ["| " + " | ".join(f"{h:<{w}}" for h, w in zip(headers, widths)) + " |"]
-    lines.append("| " + " | ".join("-" * w for w in widths) + " |")
-    for row in rows:
-        lines.append("| " + " | ".join(f"{str(row.get(h, '')):<{w}}" for h, w in zip(headers, widths)) + " |")
-    return "\n".join(lines)
+    lines = output.strip().split("\n")
+    if len(lines) < 2:
+        return f"`{output.strip()}`"
+    headers = [h.strip() for h in lines[0].split("|")]
+    md_lines = ["| " + " | ".join(headers) + " |"]
+    md_lines.append("| " + " | ".join("---" for _ in headers) + " |")
+    for line in lines[2:]:
+        cols = [c.strip() for c in line.split("|")]
+        md_lines.append("| " + " | ".join(cols) + " |")
+    return "\n".join(md_lines)
 
 
 def split_sql_statements(sql: str) -> list[str]:
@@ -180,18 +181,11 @@ def write_markdown_report(output_file: Path, config_items: list[dict],
                 for i in range(0, len(col_names), 2):
                     result_col = col_names[i]
                     time_col = col_names[i + 1]
-                    rows_json = row.get(result_col, "")
+                    output = row.get(result_col, "")
                     elapsed = row.get(time_col, "")
                     label = result_col.split("_", 2)[-1] if "_" in result_col else result_col
                     f.write(f"### {label} ({elapsed}ms)\n\n")
-                    if rows_json:
-                        try:
-                            rows_data = json.loads(rows_json)
-                            f.write(rows_to_md_table(rows_data) + "\n\n")
-                        except (json.JSONDecodeError, TypeError):
-                            f.write(f"`{rows_json}`\n\n")
-                    else:
-                        f.write("_no output_\n\n")
+                    f.write(output_to_md_table(output) + "\n\n")
 
     print(f"Report: {md_file}")
 
@@ -275,11 +269,11 @@ def main():
                 restart_db()
 
                 for i, stmt in enumerate(statements):
-                    elapsed_ms, rows_data = run_query(stmt)
+                    elapsed_ms, output = run_query(stmt)
                     result_col = col_names[i * 2]
                     time_col = col_names[i * 2 + 1]
                     print(f"{result_col}={elapsed_ms:.1f}ms ", end="", flush=True)
-                    row[result_col] = rows_to_json(rows_data)
+                    row[result_col] = output
                     row[time_col] = f"{elapsed_ms:.1f}"
 
                 print()
