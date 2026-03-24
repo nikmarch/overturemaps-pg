@@ -19,7 +19,14 @@
       "WebFetch(domain:duckdb.org)",
       "WebFetch(domain:docs.overturemaps.org)",
       "Bash(docker compose:*)",
-      "Bash(duckdb:*)"
+      "Bash(duckdb:*)",
+      "Bash(for t:*)",
+      "Bash(gh pr:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(gh api:*)",
+      "Bash(git rm:*)"
     ]
   }
 }

@@ -1,4 +1,4 @@
-CALL postgres_execute('pg', 'DROP TABLE IF EXISTS places');
+CALL postgres_execute('pg', 'DROP TABLE IF EXISTS places CASCADE');
 
 CALL postgres_execute('pg', '
     CREATE TABLE IF NOT EXISTS places (
@@ -14,7 +14,7 @@ SELECT
     geometry,
     names.primary
 FROM
-    read_parquet('s3://overturemaps-us-west-2/release/2026-01-21.0/theme=places/type=place/*');
+    read_parquet('s3://overturemaps-us-west-2/release/{release}/theme=places/type=place/*');
 
 CALL postgres_execute(
     'pg',

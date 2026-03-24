@@ -51,7 +51,25 @@ If you already have an existing `pgdata` volume, run this once:
 
 ```bash
 docker compose exec -T db psql -U postgres -d overturemaps -c "CREATE EXTENSION IF NOT EXISTS h3;"
+docker compose exec -T db psql -U postgres -d overturemaps -c "CREATE EXTENSION IF NOT EXISTS h3_postgis CASCADE;"
 ```
+
+## Benchmarks
+
+Run parameterized query benchmarks against pages:
+
+```bash
+# 1. Generate config (test cases)
+./generate_config.sh pages/h3-adaptive-clustering
+
+# 2. Run benchmarks
+./benchmark.sh pages/h3-adaptive-clustering
+
+# 3. Resume if interrupted
+./benchmark.sh pages/h3-adaptive-clustering --continue
+```
+
+Results are saved to `pages/<page>/results/`.
 
 ## Tables
 
@@ -78,7 +96,7 @@ CALL postgres_execute('pg', '
 
 INSERT INTO pg.public.mytable (id, geography)
 SELECT id, geometry
-FROM read_parquet('s3://overturemaps-us-west-2/release/2026-01-21.0/theme=...');
+FROM read_parquet('s3://overturemaps-us-west-2/release/{release}/theme=...');
 
 CALL postgres_execute('pg', 'CREATE INDEX IF NOT EXISTS mytable_geography_idx ON mytable USING GIST (geography)')
 ```

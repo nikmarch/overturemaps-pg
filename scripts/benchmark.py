@@ -19,7 +19,8 @@ Expects:
     <page-folder>/queries/*.sql
 
 Writes results to:
-    <page-folder>/results/results_<timestamp>.csv
+    <page-folder>/results/results_<timestamp>.csv   (JSON in cells, DuckDB-friendly)
+    <page-folder>/results/results_<timestamp>.md    (human-readable tables)
 """
 
 import argparse
@@ -68,15 +69,16 @@ def restart_db():
 def run_query(sql: str) -> tuple[float, str]:
     """Run SQL via psycopg2 and return (time_ms, output)."""
     conn = get_db_connection()
+    conn.autocommit = True
     try:
         cur = conn.cursor()
         start = time.perf_counter()
         cur.execute(sql)
-        rows = cur.fetchall()
         elapsed_ms = (time.perf_counter() - start) * 1000
 
         # Format output similar to psql
         if cur.description:
+            rows = cur.fetchall()
             col_names = [desc[0] for desc in cur.description]
             output_lines = [" | ".join(col_names)]
             output_lines.append("-+-".join("-" * len(name) for name in col_names))
@@ -91,15 +93,45 @@ def run_query(sql: str) -> tuple[float, str]:
         conn.close()
 
 
+def output_to_md_table(output: str) -> str:
+    """Convert psql-style output to a markdown table."""
+    if not output.strip():
+        return "_no output_"
+    lines = output.strip().split("\n")
+    if len(lines) < 2:
+        return f"`{output.strip()}`"
+    headers = [h.strip() for h in lines[0].split("|")]
+    md_lines = ["| " + " | ".join(headers) + " |"]
+    md_lines.append("| " + " | ".join("---" for _ in headers) + " |")
+    for line in lines[2:]:
+        cols = [c.strip() for c in line.split("|")]
+        md_lines.append("| " + " | ".join(cols) + " |")
+    return "\n".join(md_lines)
+
+
 def split_sql_statements(sql: str) -> list[str]:
     """Split SQL text on semicolons. Safe when files have no semicolons in literals."""
     return [s.strip() for s in sql.split(";") if s.strip()]
 
 
+def parse_description(sql: str) -> str:
+    """Extract description from a `-- description:` comment."""
+    for line in sql.split("\n"):
+        line = line.strip()
+        if line.startswith("-- description:"):
+            return line.split(":", 1)[1].strip()
+    return ""
+
+
 def parse_column_names(sql: str, file_stem: str, num_stmts: int) -> list[str]:
-    """Parse column names from a `-- columns:` comment on the first line."""
-    first_line = sql.split("\n", 1)[0].strip()
-    if first_line.startswith("-- columns:"):
+    """Parse column names from a `-- columns:` comment."""
+    first_line = None
+    for line in sql.split("\n"):
+        line = line.strip()
+        if line.startswith("-- columns:"):
+            first_line = line
+            break
+    if first_line and first_line.startswith("-- columns:"):
         names = [n.strip() for n in first_line.split(":", 1)[1].split(",")]
     else:
         names = [f"s{i}" for i in range(1, num_stmts + 1)]
@@ -125,6 +157,37 @@ def load_completed_ids(results_file: Path) -> set[str]:
         for row in csv.DictReader(f):
             completed.add(row["id"])
     return completed
+
+
+def write_markdown_report(output_file: Path, config_items: list[dict],
+                          sql_contents: dict, results: dict[str, dict]):
+    """Write a human-readable markdown report alongside the CSV."""
+    md_file = output_file.with_suffix(".md")
+    with open(md_file, "w") as f:
+        f.write("# Benchmark Results\n\n")
+        f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+
+        for config in config_items:
+            config_id = config["id"]
+            if config_id not in results:
+                continue
+            row = results[config_id]
+            header_parts = [f"{k}: {v}" for k, v in config.items()]
+            f.write(f"## {', '.join(header_parts)}\n\n")
+
+            for sql_file, (_, _, col_names, description) in sql_contents.items():
+                if description:
+                    f.write(f"**{sql_file.stem}**: {description}\n\n")
+                for i in range(0, len(col_names), 2):
+                    result_col = col_names[i]
+                    time_col = col_names[i + 1]
+                    output = row.get(result_col, "")
+                    elapsed = row.get(time_col, "")
+                    label = result_col.split("_", 2)[-1] if "_" in result_col else result_col
+                    f.write(f"### {label} ({elapsed}ms)\n\n")
+                    f.write(output_to_md_table(output) + "\n\n")
+
+    print(f"Report: {md_file}")
 
 
 def main():
@@ -153,7 +216,8 @@ def main():
         raw_sql = sql_file.read_text().strip()
         stmts = split_sql_statements(raw_sql)
         col_names = parse_column_names(raw_sql, sql_file.stem, len(stmts))
-        sql_contents[sql_file] = (raw_sql, stmts, col_names)
+        description = parse_description(raw_sql)
+        sql_contents[sql_file] = (raw_sql, stmts, col_names, description)
         header.extend(col_names)
 
     results_dir.mkdir(parents=True, exist_ok=True)
@@ -176,6 +240,7 @@ def main():
         output_file = results_dir / f"results_{timestamp}.csv"
 
     # Stream rows to CSV as each config completes
+    all_results: dict[str, dict] = {}
     mode = "a" if completed_ids else "w"
     with open(output_file, mode, newline="") as f:
         writer = csv.DictWriter(f, fieldnames=header)
@@ -186,12 +251,11 @@ def main():
             if config["id"] in completed_ids:
                 print(f"## {config.get('name', config['id'])} — skipped (already done)")
                 continue
-            name = config.get("name", config.get("id", "unknown"))
-            print(f"## {name}")
+            print(f"## {', '.join(f'{k}: {v}' for k, v in config.items())}")
             row = dict(config)
 
             for sql_file in sql_files:
-                raw_sql, _stmts_template, col_names = sql_contents[sql_file]
+                raw_sql, _stmts_template, col_names, _ = sql_contents[sql_file]
 
                 # Substitute {key} placeholders
                 rendered = raw_sql
@@ -215,8 +279,10 @@ def main():
 
             writer.writerow(row)
             f.flush()
+            all_results[config["id"]] = row
 
     print(f"Done! Saved to {output_file}")
+    write_markdown_report(output_file, config_items, sql_contents, all_results)
 
 
 if __name__ == "__main__":
