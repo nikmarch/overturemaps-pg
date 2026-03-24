@@ -1,4 +1,4 @@
--- description: Two validations. 1) Check no cell contains another (ancestor overlap). 2) Check a place assigned by H3 index actually falls within its cell boundary — returns the first mismatch or empty.
+-- description: Two validations. 1) No cell is an ancestor of another (overlap check). 2) Proves spatial intersection can lose data vs H3 index — finds a place correctly assigned by h3_latlng_to_cell but missed by ST_Intersects on the cell boundary.
 -- columns: overlapping_cells, boundary_mismatch
 SELECT count(*) AS overlapping_pairs
 FROM (
