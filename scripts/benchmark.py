@@ -172,8 +172,8 @@ def write_markdown_report(output_file: Path, config_items: list[dict],
             if config_id not in results:
                 continue
             row = results[config_id]
-            name = config.get("name", config_id)
-            f.write(f"## {name}\n\n")
+            header_parts = [f"{k}: {v}" for k, v in config.items()]
+            f.write(f"## {', '.join(header_parts)}\n\n")
 
             for sql_file, (_, _, col_names, description) in sql_contents.items():
                 if description:
@@ -251,8 +251,7 @@ def main():
             if config["id"] in completed_ids:
                 print(f"## {config.get('name', config['id'])} — skipped (already done)")
                 continue
-            name = config.get("name", config.get("id", "unknown"))
-            print(f"## {name}")
+            print(f"## {', '.join(f'{k}: {v}' for k, v in config.items())}")
             row = dict(config)
 
             for sql_file in sql_files:
