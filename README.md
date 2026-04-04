@@ -52,6 +52,7 @@ If you already have an existing `pgdata` volume, run this once:
 ```bash
 docker compose exec -T db psql -U postgres -d overturemaps -c "CREATE EXTENSION IF NOT EXISTS h3;"
 docker compose exec -T db psql -U postgres -d overturemaps -c "CREATE EXTENSION IF NOT EXISTS h3_postgis CASCADE;"
+docker compose exec -T db psql -U postgres -d overturemaps -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
 ```
 
 ## Benchmarks
