@@ -35,7 +35,7 @@ INSERT INTO pg.public.places (
 )
 SELECT
     id,
-    geometry,
+    ST_AsHEXWKB(geometry),
     names.primary,
     addresses[1].country,
     addresses[1].region,
