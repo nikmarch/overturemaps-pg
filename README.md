@@ -52,6 +52,7 @@ If you already have an existing `pgdata` volume, run this once:
 ```bash
 docker compose exec -T db psql -U postgres -d overturemaps -c "CREATE EXTENSION IF NOT EXISTS h3;"
 docker compose exec -T db psql -U postgres -d overturemaps -c "CREATE EXTENSION IF NOT EXISTS h3_postgis CASCADE;"
+docker compose exec -T db psql -U postgres -d overturemaps -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
 ```
 
 ## Benchmarks
@@ -75,14 +76,29 @@ Results are saved to `pages/<page>/results/`.
 
 | Table | Columns | Source |
 |-------|---------|--------|
-| `places` | id, geography, name | [places](https://docs.overturemaps.org/guides/places/) |
-| `divisions` | id, geography, osm_id, name | [divisions](https://docs.overturemaps.org/guides/divisions/) |
+| `places` | id, geometry, name, primary_country, primary_region, primary_subregion, primary_locality, basic_category, confidence, websites, emails, phones, sources, bbox | [places](https://docs.overturemaps.org/guides/places/) |
+| `divisions` | id, geometry, osm_id, name, class, subtype, country, region, admin_level, division_id, sources, bbox | [divisions](https://docs.overturemaps.org/guides/divisions/) |
 
-Both tables use `geography` type (accurate distance/area in meters) with GIST indexes.
+Both tables use PostGIS `geometry` columns with GIST indexes. Additional btree indexes support category, hierarchy, and region filtering; `places.name` also gets a `pg_trgm` GIN index for fast lexical lookup.
+
+## Suggested next steps
+
+This repo intentionally keeps the raw Overture themes as the main schema surface. The next useful layer should come from views/materialized views first, not by immediately introducing a pile of new tables.
+
+Recommended progression:
+
+1. Keep enriching the base import with stable, query-relevant Overture columns.
+2. Add validation queries to profile null rates, subtype distribution, category coverage, and hierarchy completeness per release.
+3. Add read-only views for:
+   - place-to-division containment
+   - division ancestry traversal
+   - category rollups by region/admin level
+4. Only then decide whether any derived tables are actually justified.
+5. Treat `pgvector` as optional and late-stage; start with `pg_trgm` + spatial filters.
 
 ## Adding New Imports
 
-Add a SQL file to `scripts/sql/`:
+Add a SQL file to `import/`:
 
 ```sql
 CALL postgres_execute('pg', 'DROP TABLE IF EXISTS mytable');
@@ -90,15 +106,15 @@ CALL postgres_execute('pg', 'DROP TABLE IF EXISTS mytable');
 CALL postgres_execute('pg', '
     CREATE TABLE IF NOT EXISTS mytable (
         id text PRIMARY KEY,
-        geography geography
+        geometry geometry
     )
 ');
 
-INSERT INTO pg.public.mytable (id, geography)
+INSERT INTO pg.public.mytable (id, geometry)
 SELECT id, geometry
 FROM read_parquet('s3://overturemaps-us-west-2/release/{release}/theme=...');
 
-CALL postgres_execute('pg', 'CREATE INDEX IF NOT EXISTS mytable_geography_idx ON mytable USING GIST (geography)')
+CALL postgres_execute('pg', 'CREATE INDEX IF NOT EXISTS mytable_geometry_idx ON mytable USING GIST (geometry)')
 ```
 
 Then run: `docker compose exec -t server python /scripts/import.py mytable --drop`
