@@ -26,7 +26,10 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(gh api:*)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(git checkout:*)",
+      "Bash(git cherry-pick:*)",
+      "Bash(git branch:*)"
     ]
   }
 }
