@@ -22,7 +22,7 @@ Parameterized query runner in `scripts/benchmark.py`. Each experiment lives in `
 -- columns: name1, name2, name3
 SELECT ...;   -- statement 1 → name1
 SELECT ...;   -- statement 2 → name2
-SELECT ...    -- statement 3 → name3 (no trailing semicolon on last)
+SELECT ...    -- statement 3 → name3 (trailing semicolon optional)
 ```
 
 - `-- description:` (optional) — appears in markdown report headers
@@ -43,8 +43,8 @@ SELECT ...    -- statement 3 → name3 (no trailing semicolon on last)
 
 ### Output
 
-- `results/<timestamp>.csv` — timing + query output per statement
-- `results/<timestamp>.md` — human-readable markdown tables
+- `<page-folder>/results/results_<timestamp>.csv` — timing + query output per statement
+- `<page-folder>/results/results_<timestamp>.md` — human-readable markdown tables
 
 ### Import
 
