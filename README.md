@@ -76,7 +76,7 @@ Results are saved to `pages/<page>/results/`.
 
 | Table | Columns | Source |
 |-------|---------|--------|
-| `places` | id, geometry, name, primary_country, primary_region, primary_subregion, primary_locality, basic_category, confidence, websites, emails, phones, sources, bbox | [places](https://docs.overturemaps.org/guides/places/) |
+| `places` | id, geometry, name, primary_country, primary_region, primary_locality, basic_category, confidence, websites, emails, phones, sources, bbox | [places](https://docs.overturemaps.org/guides/places/) |
 | `divisions` | id, geometry, osm_id, name, class, subtype, country, region, admin_level, division_id, sources, bbox | [divisions](https://docs.overturemaps.org/guides/divisions/) |
 
 Both tables use PostGIS `geometry` columns with GIST indexes. Additional btree indexes support category, hierarchy, and region filtering; `places.name` also gets a `pg_trgm` GIN index for fast lexical lookup.
