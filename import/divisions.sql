@@ -3,7 +3,7 @@ CALL postgres_execute('pg', 'DROP TABLE IF EXISTS divisions CASCADE');
 CALL postgres_execute('pg', '
     CREATE TABLE IF NOT EXISTS divisions (
         id text PRIMARY KEY,
-        geometry geometry(MultiPolygon, 4326),
+        geometry geometry(Geometry, 4326),
         osm_id text,
         name text,
         class text,
@@ -11,7 +11,7 @@ CALL postgres_execute('pg', '
         country text,
         region text,
         admin_level integer,
-        parent_division_id text,
+        division_id text,
         sources jsonb,
         bbox jsonb
     )
@@ -27,13 +27,13 @@ INSERT INTO pg.public.divisions (
     country,
     region,
     admin_level,
-    parent_division_id,
+    division_id,
     sources,
     bbox
 )
 SELECT
     id,
-    geometry,
+    ST_AsHEXWKB(geometry),
     split_part(sources[1].record_id, '@', 1),
     names.primary,
     class,
@@ -41,7 +41,7 @@ SELECT
     country,
     region,
     admin_level,
-    parent_division_id,
+    division_id,
     CAST(to_json(sources) AS JSON),
     CAST(to_json(bbox) AS JSON)
 FROM
@@ -54,7 +54,7 @@ CALL postgres_execute(
 
 CALL postgres_execute(
     'pg',
-    'CREATE INDEX IF NOT EXISTS divisions_parent_division_idx ON divisions (parent_division_id)'
+    'CREATE INDEX IF NOT EXISTS divisions_division_id_idx ON divisions (division_id)'
 );
 
 CALL postgres_execute(
