@@ -42,7 +42,7 @@ def execute_sql(con, sql, drop=False):
         statement = statement.strip()
         if not statement:
             continue
-        if "DROP TABLE" in statement and not drop:
+        if "DROP TABLE" in statement.upper() and not drop:
             continue
         con.execute(statement)
 
