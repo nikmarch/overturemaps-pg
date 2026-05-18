@@ -11,7 +11,6 @@ WITH per_worker AS (
 SELECT
   {workers_num}::int                                                        AS workers_num,
   '{type}'                                                                  AS type,
-  count(*)                                                                  AS actual_workers,
   round(avg(place_count)::numeric, 0)                                       AS avg_places,
   round(stddev(place_count)::numeric, 0)                                    AS stddev_places,
   round((stddev(place_count) / avg(place_count))::numeric, 4)               AS cv_places,
