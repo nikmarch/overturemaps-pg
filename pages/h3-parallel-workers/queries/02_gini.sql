@@ -1,4 +1,4 @@
--- description: Gini coefficient for place distribution across {workers_num} workers ({type}). 0 = perfectly uniform, 1 = all places on one worker.
+-- description: Relative uniformity of place distribution across {workers_num} workers ({type}). Values approach 0 as N grows with equal loads (use cv_places and imbalance_ratio for absolute comparisons).
 -- columns: gini
 SELECT
   round((1 - sum(cumulative_share) * 2.0 / count(*))::numeric, 6) AS gini_places
