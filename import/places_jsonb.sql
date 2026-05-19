@@ -12,7 +12,7 @@ INSERT INTO pg.public.places_jsonb (id, geometry, data)
 SELECT
     id,
     ST_AsHEXWKB(geometry),
-    CAST(to_json({
+    CAST(regexp_replace(CAST(to_json({
         'name':                names.primary,
         'basic_category':      basic_category,
         'primary_category':    categories.primary,
@@ -31,7 +31,7 @@ SELECT
         'names_full':          names,
         'sources':             sources,
         'bbox':                bbox
-    }) AS JSON)
+    }) AS VARCHAR), '\\u0000', '', 'g') AS JSON)
 FROM
     read_parquet('s3://overturemaps-us-west-2/release/{release}/theme=places/type=place/*');
 

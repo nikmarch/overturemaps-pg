@@ -52,9 +52,9 @@ SELECT
     socials,
     emails,
     phones,
-    CAST(to_json(names) AS JSON),
-    CAST(to_json(sources) AS JSON),
-    CAST(to_json(bbox) AS JSON)
+    CAST(regexp_replace(CAST(to_json(names) AS VARCHAR), '\\u0000', '', 'g') AS JSON),
+    CAST(regexp_replace(CAST(to_json(sources) AS VARCHAR), '\\u0000', '', 'g') AS JSON),
+    CAST(regexp_replace(CAST(to_json(bbox) AS VARCHAR), '\\u0000', '', 'g') AS JSON)
 FROM
     read_parquet('s3://overturemaps-us-west-2/release/{release}/theme=places/type=place/*');
 
