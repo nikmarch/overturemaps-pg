@@ -26,7 +26,27 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(gh api:*)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(git checkout:*)",
+      "Bash(git pull:*)",
+      "Bash(mkdir -p /home/nik/code/laboratory/overturemaps-pg/pages/h3-parallel-workers/queries /home/nik/code/laboratory/overturemaps-pg/pages/h3-parallel-workers/results)",
+      "Bash(mkdir -p /home/nik/code/laboratory/marchenco/pages/blog/h3-parallel-workers)",
+      "Bash(docker volume *)",
+      "Bash(gh run *)",
+      "WebSearch",
+      "WebFetch(domain:h3geo.org)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:deepwiki.com)",
+      "WebFetch(domain:observablehq.com)",
+      "Bash(awk '{print $2}')",
+      "Bash(xargs '-I{}' sh -c ' *)",
+      "Bash(git cherry-pick *)",
+      "Bash(node -e ' *)",
+      "Bash(mv pages/blog/h3-parallel-workers/images/la-3-workers.png.tmp pages/blog/h3-parallel-workers/images/la-3-workers.png)",
+      "Bash(git -C /home/nik/code/laboratory/overturemaps-pg status)",
+      "Bash(git -C /home/nik/code/laboratory/overturemaps-pg log --oneline -5)",
+      "Bash(git *)",
+      "Bash(/usr/bin/tmux *)"
     ]
   }
 }
