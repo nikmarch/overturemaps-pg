@@ -1,0 +1,30 @@
+{
+  "tilejson": "3.0.0",
+  "name": "divisions",
+  "description": "Overture divisions (pg_tileserv)",
+  "scheme": "xyz",
+  "tiles": ["/tiles/public.divisions/{z}/{x}/{y}.pbf"],
+  "minzoom": 0,
+  "maxzoom": 14,
+  "bounds": [-180, -85.05113, 180, 83.87518],
+  "center": [0, 0, 2],
+  "vector_layers": [
+    {
+      "id": "public.divisions",
+      "description": "Overture divisions",
+      "minzoom": 0,
+      "maxzoom": 14,
+      "fields": {
+        "id": "String",
+        "osm_id": "String",
+        "name": "String",
+        "class": "String",
+        "subtype": "String",
+        "country": "String",
+        "region": "String",
+        "admin_level": "Number",
+        "division_id": "String"
+      }
+    }
+  ]
+}

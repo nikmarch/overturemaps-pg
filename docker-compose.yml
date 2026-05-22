@@ -6,11 +6,11 @@ services:
     image: overturemaps-postgis-h3:17-3.5
     platform: linux/amd64
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: overturemaps
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-overturemaps}
     ports:
-      - "5434:5432"
+      - "${POSTGRES_PORT:-5434}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     command:
@@ -36,9 +36,82 @@ services:
     environment:
       PGHOST: db
       PGPORT: 5432
-      PGUSER: postgres
-      PGPASSWORD: postgres
-      PGDATABASE: overturemaps
+      PGUSER: ${POSTGRES_USER:-postgres}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      PGDATABASE: ${POSTGRES_DB:-overturemaps}
+
+  # One-shot: create/refresh the read-only `tileserv` role and grants. Run
+  # this once after the initial import (and again whenever you grant a new
+  # table to the role). Idempotent.
+  #
+  #   docker compose --profile init run --rm init-tileserv
+  #
+  # Reads TILESERV_PASSWORD + POSTGRES_* from .env via env_file, so no shell
+  # sourcing required.
+  init-tileserv:
+    image: postgres:17-alpine
+    depends_on:
+      - db
+    profiles: ["init"]
+    env_file: .env
+    volumes:
+      - ./pg-tileserv/init-role.sql:/init-role.sql:ro
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        until pg_isready -h db -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" >/dev/null 2>&1; do
+          echo "waiting for db..."; sleep 1
+        done
+        exec psql "postgresql://$$POSTGRES_USER:$$POSTGRES_PASSWORD@db:5432/$$POSTGRES_DB" \
+          -v ON_ERROR_STOP=1 \
+          -v TILESERV_PASSWORD="$$TILESERV_PASSWORD" \
+          -f /init-role.sql
+
+  # pg_tileserv — PostGIS-native MVT server. Connects to db via the host-
+  # published port so the pg-tileserv binary stays distroless without needing
+  # docker-network resolution. Read-only `tileserv` role is bootstrapped via
+  # the init-tileserv service above; see README.
+  pg-tileserv:
+    image: pramsey/pg_tileserv:latest
+    container_name: pg-tileserv
+    restart: unless-stopped
+    network_mode: host
+    profiles: ["serve"]
+    env_file: .env
+    environment:
+      DATABASE_URL: "postgresql://tileserv:${TILESERV_PASSWORD:?TILESERV_PASSWORD is required (see .env.example)}@127.0.0.1:${POSTGRES_PORT:-5434}/${POSTGRES_DB:-overturemaps}?sslmode=disable"
+    volumes:
+      - ./pg-tileserv/config.toml:/config/config.toml:ro
+    command: ["--config", "/config/config.toml"]
+    # pramsey/pg_tileserv is distroless — no wget/curl/sh to probe inside.
+    # Liveness is observed indirectly by whatever proxies it (e.g. nginx 502
+    # on /tiles/* if pg_tileserv crashes).
+
+  # www-kepler — kepler.gl SPA. Static nginx:alpine final stage serving at
+  # /kepler/. Build context is the www-kepler/ folder so this directory can
+  # be lifted into another repo unchanged.
+  www-kepler:
+    build:
+      context: ./www-kepler
+      dockerfile: Dockerfile
+      args:
+        # Vite inlines the token into the bundle, so use a URL-restricted
+        # Mapbox public token (pk.*). Optional — empty token works too, the
+        # basemap is rendered by maplibre regardless; only Kepler's Mapbox
+        # SDK call-sites (geocoder, etc.) need it. Falls back to
+        # DEKART_MAPBOX_TOKEN for repos that already had one set for Dekart.
+        MAPBOX_ACCESS_TOKEN: ${MAPBOX_ACCESS_TOKEN:-${DEKART_MAPBOX_TOKEN:-}}
+    container_name: www-kepler
+    restart: unless-stopped
+    network_mode: host
+    profiles: ["serve"]
+    env_file: .env
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8088/kepler/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
 volumes:
   pgdata:

@@ -1,0 +1,24 @@
+{
+  "tilejson": "3.0.0",
+  "name": "h3-adaptive",
+  "description": "H3 adaptive clustering of Overture places (threshold 10000)",
+  "scheme": "xyz",
+  "tiles": ["/tiles/public.places_h3_t10000/{z}/{x}/{y}.pbf"],
+  "minzoom": 0,
+  "maxzoom": 14,
+  "bounds": [-180, -85.05113, 180, 85.05113],
+  "center": [0, 0, 2],
+  "vector_layers": [
+    {
+      "id": "public.places_h3_t10000",
+      "description": "h3 cells, varying resolution per cell density",
+      "minzoom": 0,
+      "maxzoom": 14,
+      "fields": {
+        "cell": "String",
+        "res": "Number",
+        "place_count": "Number"
+      }
+    }
+  ]
+}
