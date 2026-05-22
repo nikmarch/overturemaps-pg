@@ -49,13 +49,13 @@ function mvtDataset({id, label, tilesetDataPath, tilesetMetadataPath, color, map
           ],
         },
         mapState,
-        mapStyle: {styleType: 'dark-matter'},
+        mapStyle: {styleType: 'voyager'},
       },
     },
   };
 }
 
-export const EXPERIMENTS = [
+export const TABLES = [
   {
     id: 'all-places',
     label: 'All places (MVT)',
