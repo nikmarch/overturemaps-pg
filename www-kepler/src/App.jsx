@@ -5,7 +5,7 @@ import {addDataToMap, removeDataset, wrapTo} from '@kepler.gl/actions';
 import KeplerGlSchema from '@kepler.gl/schemas';
 import LZString from 'lz-string';
 
-import {EXPERIMENTS} from './experiments/index.js';
+import {TABLES} from './tables/index.js';
 
 // Read the public Mapbox token from build-time env (Vite inlines it). With a
 // token, Kepler stops nagging about "Mapbox Token not valid" and the few
@@ -15,6 +15,11 @@ const MAP_ID = 'main';
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || '';
 
 const MAP_STYLES = [
+  {
+    id: 'voyager',
+    label: 'Voyager',
+    url: 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json',
+  },
   {
     id: 'positron',
     label: 'Positron (light)',
@@ -26,9 +31,10 @@ const MAP_STYLES = [
     url: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
   },
 ];
+const DEFAULT_MAP_STYLE = 'voyager';
 
 // URL hash schema: #s=<lz-compressed JSON of {ids, cfg}>
-//   ids — array of selected EXPERIMENTS ids (drives which datasets to mount)
+//   ids — array of selected TABLES ids (drives which datasets to mount)
 //   cfg — full kepler config from KeplerGlSchema.getConfigToSave(), holds
 //         per-layer styling, mapState (view), mapStyle (basemap), filters, etc.
 // Compressed because cfg is 5-15kB JSON; lz-string brings the hash to ~1-3kB.
@@ -54,19 +60,19 @@ function writeUrlState(ids, cfg) {
   history.replaceState(null, '', '#s=' + encoded);
 }
 
-function buildMergedConfig(exps) {
-  if (exps.length === 0) {
-    return {version: 'v1', config: {mapStyle: {styleType: 'dark-matter'}}};
+function buildMergedConfig(tables) {
+  if (tables.length === 0) {
+    return {version: 'v1', config: {mapStyle: {styleType: DEFAULT_MAP_STYLE}}};
   }
-  const layers = exps.flatMap((e) => e.config.config.visState.layers);
+  const layers = tables.flatMap((t) => t.config.config.visState.layers);
   return {
     version: 'v1',
     config: {
       visState: {layers},
-      // First selected experiment's mapState seeds the initial view; once the
-      // user pans/zooms, the redux subscriber persists the new mapState to URL.
-      mapState: exps[0].config.config.mapState,
-      mapStyle: {styleType: 'dark-matter'},
+      // First selected table's mapState seeds the initial view; once the user
+      // pans/zooms, the redux subscriber persists the new mapState to URL.
+      mapState: tables[0].config.config.mapState,
+      mapStyle: {styleType: DEFAULT_MAP_STYLE},
     },
   };
 }
@@ -79,7 +85,7 @@ export default function App() {
 
   const initialState = useRef(readUrlState());
   const [selectedIds, setSelectedIds] = useState(
-    () => initialState.current?.ids ?? [EXPERIMENTS[0].id]
+    () => initialState.current?.ids ?? [TABLES[0].id]
   );
   const selectedIdsRef = useRef(selectedIds);
   useEffect(() => { selectedIdsRef.current = selectedIds; }, [selectedIds]);
@@ -90,15 +96,15 @@ export default function App() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  // One-shot initial load: seed kepler with the experiments named in URL (or
-  // the default first one) and apply the saved config if present so refresh
+  // One-shot initial load: seed kepler with the tables named in URL (or the
+  // default first one) and apply the saved config if present so refresh
   // restores both selection and styling.
   useEffect(() => {
     const ids = selectedIdsRef.current;
-    const exps = EXPERIMENTS.filter((e) => ids.includes(e.id));
-    if (exps.length === 0) return;
-    const datasets = exps.flatMap((e) => e.datasets);
-    const config = initialState.current?.cfg ?? buildMergedConfig(exps);
+    const tables = TABLES.filter((t) => ids.includes(t.id));
+    if (tables.length === 0) return;
+    const datasets = tables.flatMap((t) => t.datasets);
+    const config = initialState.current?.cfg ?? buildMergedConfig(tables);
     dispatch(
       wrapTo(
         MAP_ID,
@@ -109,8 +115,8 @@ export default function App() {
         })
       )
     );
-    // Run once on mount — toggling happens via toggleExperiment below, which
-    // does surgical add/remove instead of full rebuild to preserve styling.
+    // Run once on mount — toggling happens via toggleTable below, which does
+    // surgical add/remove instead of full rebuild to preserve styling.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -130,24 +136,32 @@ export default function App() {
     return () => { unsub(); clearTimeout(timer); };
   }, [store]);
 
-  function toggleExperiment(id) {
-    const exp = EXPERIMENTS.find((e) => e.id === id);
-    if (!exp) return;
+  function toggleTable(id) {
+    const table = TABLES.find((t) => t.id === id);
+    if (!table) return;
     const isOn = selectedIds.includes(id);
     if (isOn) {
-      exp.datasets.forEach((d) =>
+      table.datasets.forEach((d) =>
         dispatch(wrapTo(MAP_ID, removeDataset(d.info.id)))
       );
       setSelectedIds(selectedIds.filter((x) => x !== id));
     } else {
-      // keepExistingConfig: true so already-mounted layers + user styling stay.
+      // When adding to an existing selection, strip mapState + mapStyle from
+      // the table's config so kepler doesn't yank the view to that table's
+      // default center/zoom or swap the basemap the user picked. Only the
+      // layer definition flows through. When the current selection is empty,
+      // pass the full config so the new layer is actually framed.
+      const hadAny = selectedIds.length > 0;
+      const config = hadAny
+        ? {version: 'v1', config: {visState: table.config.config.visState}}
+        : table.config;
       dispatch(
         wrapTo(
           MAP_ID,
           addDataToMap({
-            datasets: exp.datasets,
+            datasets: table.datasets,
             options: {centerMap: false, readOnly: false, keepExistingConfig: true},
-            config: exp.config,
+            config,
           })
         )
       );
@@ -167,13 +181,13 @@ export default function App() {
         overflowY: 'auto',
       }}>
         <h2 style={{margin: '0 0 12px', fontSize: 14, letterSpacing: 0.4, color: '#8aa'}}>
-          experiments
+          tables
         </h2>
         <ul style={{listStyle: 'none', padding: 0, margin: 0}}>
-          {EXPERIMENTS.map((e) => {
-            const on = selectedIds.includes(e.id);
+          {TABLES.map((t) => {
+            const on = selectedIds.includes(t.id);
             return (
-              <li key={e.id}>
+              <li key={t.id}>
                 <label
                   style={{
                     display: 'flex',
@@ -193,13 +207,13 @@ export default function App() {
                   <input
                     type="checkbox"
                     checked={on}
-                    onChange={() => toggleExperiment(e.id)}
+                    onChange={() => toggleTable(t.id)}
                     style={{marginTop: 2}}
                   />
                   <span style={{flex: 1}}>
-                    {e.label}
-                    {e.note && (
-                      <div style={{fontSize: 11, color: '#778', marginTop: 2}}>{e.note}</div>
+                    {t.label}
+                    {t.note && (
+                      <div style={{fontSize: 11, color: '#778', marginTop: 2}}>{t.note}</div>
                     )}
                   </span>
                 </label>
