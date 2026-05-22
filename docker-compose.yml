@@ -98,9 +98,8 @@ services:
         # Vite inlines the token into the bundle, so use a URL-restricted
         # Mapbox public token (pk.*). Optional — empty token works too, the
         # basemap is rendered by maplibre regardless; only Kepler's Mapbox
-        # SDK call-sites (geocoder, etc.) need it. Falls back to
-        # DEKART_MAPBOX_TOKEN for repos that already had one set for Dekart.
-        MAPBOX_ACCESS_TOKEN: ${MAPBOX_ACCESS_TOKEN:-${DEKART_MAPBOX_TOKEN:-}}
+        # SDK call-sites (geocoder, etc.) need it.
+        MAPBOX_ACCESS_TOKEN: ${MAPBOX_ACCESS_TOKEN:-}
     container_name: www-kepler
     restart: unless-stopped
     network_mode: host

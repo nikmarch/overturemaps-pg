@@ -19,15 +19,16 @@
   \quit 1
 \endif
 
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'tileserv') THEN
-        EXECUTE format('CREATE ROLE tileserv LOGIN PASSWORD %L', :'TILESERV_PASSWORD');
-    ELSE
-        EXECUTE format('ALTER ROLE tileserv WITH PASSWORD %L', :'TILESERV_PASSWORD');
-    END IF;
-END
-$$;
+-- Create-or-update the role. psql `:'VAR'` substitution only works at the
+-- top level (DO blocks ship plpgsql source to the server unchanged), so we
+-- build the DDL string client-side via format() + \gexec instead.
+SELECT format('CREATE ROLE tileserv LOGIN PASSWORD %L', :'TILESERV_PASSWORD')
+WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'tileserv')
+\gexec
+
+SELECT format('ALTER ROLE tileserv WITH PASSWORD %L', :'TILESERV_PASSWORD')
+WHERE EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'tileserv')
+\gexec
 
 GRANT CONNECT ON DATABASE overturemaps TO tileserv;
 GRANT USAGE ON SCHEMA public TO tileserv;
