@@ -1,0 +1,28 @@
+{
+  "tilejson": "3.0.0",
+  "name": "places",
+  "description": "Overture places (pg_tileserv)",
+  "scheme": "xyz",
+  "tiles": ["/tiles/public.places/{z}/{x}/{y}.pbf"],
+  "minzoom": 8,
+  "maxzoom": 18,
+  "bounds": [-180, -89.913, 180, 90],
+  "center": [0, 0, 8],
+  "vector_layers": [
+    {
+      "id": "public.places",
+      "description": "Overture places",
+      "minzoom": 8,
+      "maxzoom": 18,
+      "fields": {
+        "id": "String",
+        "name": "String",
+        "primary_country": "String",
+        "primary_region": "String",
+        "primary_locality": "String",
+        "basic_category": "String",
+        "confidence": "Number"
+      }
+    }
+  ]
+}

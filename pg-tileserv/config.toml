@@ -1,0 +1,33 @@
+# pg_tileserv config — serves MVT tiles for the overturemaps-pg dataset
+# (places + divisions + h3-adaptive MV). Listens on 127.0.0.1:7800 and is
+# expected to sit behind a reverse proxy mounted at /tiles/.
+#
+# DATABASE_URL is set via env in docker-compose so this file ships no
+# credentials. Other settings below are deliberate overrides of defaults.
+
+# Bind loopback only — exposure is via main nginx, not direct.
+HttpHost = "127.0.0.1"
+HttpPort = 7800
+
+# Layers are served under /tiles/{schema}.{table}/{z}/{x}/{y}.pbf so that the
+# nginx `location /tiles/` proxy strips the prefix cleanly. The catalog index
+# is /tiles/index.json.
+UrlBase = "/tiles"
+
+# Tile generation tuning. Defaults are sensible; comments here for future
+# tweaks if we observe slow tiles in pg_stat_statements.
+#  - MaxFeaturesPerTile caps the per-tile feature count so a tile at z 6 over
+#    72M places doesn't OOM. We rely on min-zoom gating in the layer config too.
+MaxFeaturesPerTile = 10000
+
+# Output tile coordinate system: Web Mercator (EPSG:3857), the slippy-map
+# standard. Source geometry in places/divisions is EPSG:4326 — pg_tileserv
+# reprojects server-side via ST_Transform. Allowlist of which tables can be
+# served is enforced by the `tileserv` Postgres role's grants
+# (see init-role.sql), not in this file.
+CoordinateSystem.SRID = 3857
+
+# CORS — allow same-origin only. Main nginx re-adds the explicit ACAO header.
+CORSOrigins = ["*"]
+
+DbPoolMaxConns = 10

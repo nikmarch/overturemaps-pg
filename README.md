@@ -55,6 +55,52 @@ docker compose exec -T db psql -U postgres -d overturemaps -c "CREATE EXTENSION 
 docker compose exec -T db psql -U postgres -d overturemaps -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
 ```
 
+## Serving stack: pg_tileserv + kepler.gl
+
+In addition to the import + benchmark workflows, this repo ships an optional MVT tile server (pg_tileserv) and a kepler.gl viewer that consume the imported data. Both run as separate compose services under the `serve` profile, so `docker compose up -d` keeps them out of the way unless you ask for them.
+
+### Setup
+
+```bash
+cp .env.example .env
+# Edit .env:
+#   TILESERV_PASSWORD   — read-only Postgres role password
+#   MAPBOX_ACCESS_TOKEN — optional, only needed for Kepler's Mapbox SDK paths
+#   POSTGRES_PASSWORD   — admin role; rotate if exposing the port off-host
+
+# 1. Bring up db + import data + build the h3-adaptive MV (one time)
+./start.sh
+./benchmark.sh pages/h3-adaptive-clustering        # creates places_h3_t10000
+
+# 2. Bootstrap the read-only tileserv role + grants (idempotent;
+#    re-run whenever you add new tables to the allow-list)
+docker compose --profile init run --rm init-tileserv
+
+# 3. Start the serving stack
+docker compose --profile serve up -d --build pg-tileserv www-kepler
+```
+
+docker-compose reads `.env` automatically for variable substitution and the `init-tileserv` + `pg-tileserv` + `www-kepler` services attach it via `env_file:`, so no shell sourcing is required.
+
+### Endpoints
+
+| Service     | URL                                              | Notes |
+|-------------|--------------------------------------------------|-------|
+| pg_tileserv | http://127.0.0.1:7800/                           | Tile index at `/index.json`; tiles at `/{schema}.{table}/{z}/{x}/{y}.pbf` |
+| www-kepler  | http://127.0.0.1:8088/kepler/                    | SPA with three default experiments (places, divisions, h3-adaptive) |
+
+Both bind loopback only and are intended to sit behind a reverse proxy that mounts pg_tileserv at `/tiles/` and the kepler SPA at `/kepler/`. The kepler experiments fetch tiles from `/tiles/...` relative to the page origin, so the same nginx must front both.
+
+### Layers exposed
+
+The `tileserv` Postgres role only has `SELECT` on three tables — see `pg-tileserv/init-role.sql` for the allow-list:
+
+- `public.places` — Overture places, point geometry
+- `public.divisions` — Overture admin polygons
+- `public.places_h3_t10000` — h3-adaptive clustering MV (built by `pages/h3-adaptive-clustering`)
+
+To expose another table, grant `SELECT` to the `tileserv` role and pg_tileserv will auto-discover it after a restart (or HUP).
+
 ## Benchmarks
 
 Run parameterized query benchmarks against pages:
