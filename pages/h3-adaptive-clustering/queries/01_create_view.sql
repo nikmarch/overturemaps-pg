@@ -1,5 +1,5 @@
--- description: Create adaptive H3 materialized view. Each place is assigned to the coarsest resolution where its cell count stays under the threshold. Strict hierarchy via h3_cell_to_parent.
--- columns: drop, create_view, count
+-- description: Create adaptive H3 materialized view. Each place is assigned to the coarsest resolution where its cell count stays under the threshold. Strict hierarchy via h3_cell_to_parent. Includes a geom column so pg_tileserv can serve the view directly as an MVT source.
+-- columns: drop, create_view, gist_index, count
 DROP MATERIALIZED VIEW IF EXISTS places_h3_t{threshold};
 
 CREATE MATERIALIZED VIEW places_h3_t{threshold} AS
@@ -41,13 +41,35 @@ tagged AS (
   JOIN c4 ON b.h3_r4=c4.cell JOIN c5 ON b.h3_r5=c5.cell JOIN c6 ON b.h3_r6=c6.cell
   JOIN c7 ON b.h3_r7=c7.cell JOIN c8 ON b.h3_r8=c8.cell JOIN c9 ON b.h3_r9=c9.cell
   JOIN c10 ON b.h3_r10=c10.cell
+),
+agg AS (
+  SELECT
+    h3_cell_to_parent(t.h3_r10, t.emit_res) AS cell,
+    t.emit_res AS res,
+    SUM(b.place_count)::bigint AS place_count
+  FROM base b
+  JOIN tagged t ON b.h3_r10 = t.h3_r10
+  GROUP BY 1, 2
 )
-SELECT
-  h3_cell_to_parent(t.h3_r10, t.emit_res) AS cell,
-  t.emit_res AS res,
-  SUM(b.place_count)::bigint AS place_count
-FROM base b
-JOIN tagged t ON b.h3_r10 = t.h3_r10
-GROUP BY 1, 2;
+SELECT cell, res, place_count,
+       -- h3_cell_to_boundary_geometry wraps this same expression, but loses
+       -- the postgis `geometry` type resolution when inlined into the MV
+       -- query (search_path quirk). Calling the WKB form directly and
+       -- casting via the fully-qualified type sidesteps it. h3 cells are in
+       -- WGS84; the WKB has no SRID embedded so we force 4326 — without it
+       -- the geometry column registers as SRID 0 in geometry_columns and
+       -- pg_tileserv refuses to serve the layer (can't reproject to Web
+       -- Mercator). The double cast is required: ST_SetSRID alone returns a
+       -- generic geometry, and CREATE MATERIALIZED VIEW infers the column
+       -- type from the expression — so we cast a second time to the fully
+       -- parameterised geometry(Polygon, 4326) so the typmod sticks.
+       -- Geometry (not Polygon) because cells crossing the antimeridian come
+       -- back as MultiPolygon — Polygon typmod would reject them.
+       CAST(public.ST_SetSRID(h3_cell_to_boundary_wkb(cell)::public.geometry, 4326)
+            AS public.geometry(Geometry, 4326)) AS geom
+FROM agg;
+
+CREATE INDEX places_h3_t{threshold}_geom_idx
+  ON places_h3_t{threshold} USING GIST (geom);
 
 SELECT count(*) AS total_cells FROM places_h3_t{threshold}
