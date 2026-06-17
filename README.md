@@ -87,9 +87,11 @@ docker-compose reads `.env` automatically for variable substitution and the `ini
 | Service     | URL                                              | Notes |
 |-------------|--------------------------------------------------|-------|
 | pg_tileserv | http://127.0.0.1:7800/                           | Tile index at `/index.json`; tiles at `/{schema}.{table}/{z}/{x}/{y}.pbf` |
-| www-kepler  | http://127.0.0.1:8088/kepler/                    | SPA with three default experiments (places, divisions, h3-adaptive) |
+| www-kepler  | http://127.0.0.1:8088/kepler/                    | SPA with three toggleable tables (places, divisions, h3-adaptive) |
 
-Both bind loopback only and are intended to sit behind a reverse proxy that mounts pg_tileserv at `/tiles/` and the kepler SPA at `/kepler/`. The kepler experiments fetch tiles from `/tiles/...` relative to the page origin, so the same nginx must front both.
+Both bind loopback only and are intended to sit behind a reverse proxy that mounts pg_tileserv at `/tiles/` and the kepler SPA at `/kepler/`. The kepler tables fetch tiles from `/tiles/...` relative to the page origin, so the same nginx must front both.
+
+The SPA persists state in the URL hash (`#s=…`, lz-string-compressed): selected tables, per-layer styling, map view, and basemap all round-trip through refresh and can be copied or bookmarked to share a specific view. Tables can be mixed on the same map — toggling one on adds its layer without re-centering or swapping the basemap (Carto Voyager by default; Positron and Dark Matter also available).
 
 ### Layers exposed
 
