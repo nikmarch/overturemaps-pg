@@ -1,5 +1,5 @@
--- description: TOAST impact — same filter on default toast (2040 bytes) vs aggressive toast (128 bytes)
--- columns: toast_sizes, jsonb_default, jsonb_lowthr
+-- description: TOAST storage — default toast (2040 bytes) vs aggressive toast (128 bytes). Query-timing comparison lives in 02-05, which now run all three tables.
+-- columns: toast_sizes
 SELECT
     'places_jsonb'        AS "table",
     current_setting('block_size')                                                                               AS page_bytes,
@@ -12,6 +12,4 @@ SELECT
     current_setting('block_size'),
     pg_size_pretty(pg_relation_size('places_jsonb_lowthr')),
     pg_size_pretty(pg_total_relation_size((SELECT reltoastrelid FROM pg_class WHERE relname = 'places_jsonb_lowthr'))),
-    (SELECT reloptions FROM pg_class WHERE relname = 'places_jsonb_lowthr');
-SELECT count(*) FROM places_jsonb       WHERE data->>'primary_country' = '{country}' AND data->>'basic_category' = '{category}';
-SELECT count(*) FROM places_jsonb_lowthr WHERE data->>'primary_country' = '{country}' AND data->>'basic_category' = '{category}'
+    (SELECT reloptions FROM pg_class WHERE relname = 'places_jsonb_lowthr')
