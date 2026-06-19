@@ -75,6 +75,23 @@ class TestExecuteSql:
         # lowercase variant is still recognised as a DROP TABLE and skipped
         con.execute.assert_not_called()
 
+    def test_strips_line_comment(self):
+        con = self._mock_con()
+        execute_sql(con, "-- a comment\nSELECT 1")
+        con.execute.assert_called_once_with("SELECT 1")
+
+    def test_semicolon_inside_comment_does_not_split_statement(self):
+        # Regression: a ';' inside a -- comment must not sever the next line
+        # into a bogus statement (previously raised a parser error).
+        con = self._mock_con()
+        execute_sql(con, "-- trigger fires; it cannot lower it\nSELECT 1")
+        con.execute.assert_called_once_with("SELECT 1")
+
+    def test_strips_inline_trailing_comment(self):
+        con = self._mock_con()
+        execute_sql(con, "SELECT 1 -- trailing; note")
+        con.execute.assert_called_once_with("SELECT 1")
+
     def test_statements_executed_in_order(self):
         con = self._mock_con()
         execute_sql(con, "SELECT 1; SELECT 2; SELECT 3")

@@ -4,7 +4,7 @@
 -- anything. The TOAST machinery only triggers when a tuple exceeds the fixed
 -- ~2 KB TOAST_TUPLE_THRESHOLD (page size / 4, a compile-time constant).
 -- toast_tuple_target only sets the size the toaster shrinks toward AFTER that
--- trigger fires; it cannot lower the trigger. Every places row is ~1.1-1.2 KB,
+-- trigger fires, and cannot lower the trigger. Every places row is ~1.1-1.2 KB,
 -- under 2 KB, so the toaster never runs and this table is byte-identical to
 -- places_jsonb. Kept as the evidence behind the article's TOAST section.
 --
