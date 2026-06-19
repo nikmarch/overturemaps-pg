@@ -81,14 +81,4 @@ CALL postgres_execute(
 CALL postgres_execute(
     'pg',
     'CREATE INDEX IF NOT EXISTS places_confidence_idx ON places (confidence)'
-);
-
-CALL postgres_execute(
-    'pg',
-    'CREATE EXTENSION IF NOT EXISTS pg_trgm'
-);
-
-CALL postgres_execute(
-    'pg',
-    'CREATE INDEX IF NOT EXISTS places_name_trgm_idx ON places USING GIN (name gin_trgm_ops)'
 )

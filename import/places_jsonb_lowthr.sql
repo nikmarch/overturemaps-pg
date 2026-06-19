@@ -7,7 +7,10 @@
 -- trigger fires; it cannot lower the trigger. Every places row is ~1.1-1.2 KB,
 -- under 2 KB, so the toaster never runs and this table is byte-identical to
 -- places_jsonb. Kept as the evidence behind the article's TOAST section.
--- Dependency: places_jsonb must exist first.
+--
+-- Index set is kept IDENTICAL to places_jsonb so the two tables differ only by
+-- the toast_tuple_target reloption — a fair comparison. Dependency: places_jsonb
+-- must exist first.
 
 CALL postgres_execute('pg', 'DROP TABLE IF EXISTS places_jsonb_lowthr CASCADE');
 
@@ -37,4 +40,19 @@ CALL postgres_execute(
 CALL postgres_execute(
     'pg',
     'CREATE INDEX IF NOT EXISTS places_jsonb_lowthr_country_category_idx ON places_jsonb_lowthr ((data->>''primary_country''), (data->>''basic_category''))'
+);
+
+CALL postgres_execute(
+    'pg',
+    'CREATE INDEX IF NOT EXISTS places_jsonb_lowthr_country_idx ON places_jsonb_lowthr ((data->>''primary_country''))'
+);
+
+CALL postgres_execute(
+    'pg',
+    'CREATE INDEX IF NOT EXISTS places_jsonb_lowthr_primary_category_idx ON places_jsonb_lowthr ((data->>''primary_category''))'
+);
+
+CALL postgres_execute(
+    'pg',
+    'CREATE INDEX IF NOT EXISTS places_jsonb_lowthr_confidence_idx ON places_jsonb_lowthr (((data->>''confidence'')::double precision))'
 )
