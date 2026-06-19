@@ -251,7 +251,7 @@ def main():
             if config["id"] in completed_ids:
                 print(f"## {config.get('name', config['id'])} — skipped (already done)")
                 continue
-            print(f"## {', '.join(f'{k}: {v}' for k, v in config.items())}")
+            print(f"\n## {', '.join(f'{k}: {v}' for k, v in config.items())}")
             row = dict(config)
 
             for sql_file in sql_files:
@@ -266,16 +266,15 @@ def main():
 
                 print(f"  {sql_file.stem}: ", end="", flush=True)
                 restart_db()
+                print()  # end the "restarting db... ready." line
 
                 for i, stmt in enumerate(statements):
                     elapsed_ms, output = run_query(stmt)
                     result_col = col_names[i * 2]
                     time_col = col_names[i * 2 + 1]
-                    print(f"{result_col}={elapsed_ms:.1f}ms ", end="", flush=True)
+                    print(f"    {result_col}={elapsed_ms:.1f}ms", flush=True)
                     row[result_col] = output
                     row[time_col] = f"{elapsed_ms:.1f}"
-
-                print()
 
             writer.writerow(row)
             f.flush()
