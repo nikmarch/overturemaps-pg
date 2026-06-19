@@ -75,7 +75,12 @@ CALL postgres_execute(
 
 CALL postgres_execute(
     'pg',
-    'CREATE INDEX IF NOT EXISTS places_country_region_idx ON places (primary_country, primary_region)'
+    'CREATE INDEX IF NOT EXISTS places_country_category_idx ON places (primary_country, basic_category)'
+);
+
+CALL postgres_execute(
+    'pg',
+    'CREATE INDEX IF NOT EXISTS places_country_idx ON places (primary_country)'
 );
 
 CALL postgres_execute(

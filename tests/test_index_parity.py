@@ -78,6 +78,45 @@ class TestJsonbLowthrIndexParity:
 
 
 # ---------------------------------------------------------------------------
+# all three tables carry the same set of indexes (by role)
+# ---------------------------------------------------------------------------
+
+class TestAllThreeTablesSameIndexRoles:
+    """Every places* table must have the SAME indexes so the only variable in
+    the benchmark is the storage format / TOAST target — not index design.
+    Primitive uses typed columns while the JSONB tables use ->> expressions,
+    so only the index *roles* (names) are required to match across all three,
+    not the definitions.
+    """
+
+    def _role_sets(self):
+        return {
+            "places": set(index_roles(IMPORT_DIR / "places.sql", "places")),
+            "places_jsonb": set(
+                index_roles(IMPORT_DIR / "places_jsonb.sql", "places_jsonb")
+            ),
+            "places_jsonb_lowthr": set(
+                index_roles(
+                    IMPORT_DIR / "places_jsonb_lowthr.sql", "places_jsonb_lowthr"
+                )
+            ),
+        }
+
+    def test_all_three_have_the_same_index_roles(self):
+        sets = self._role_sets()
+        ref = sets["places_jsonb"]
+        for table, roles in sets.items():
+            assert roles == ref, (
+                f"{table} index roles differ from places_jsonb; "
+                f"only in {table}: {roles - ref}; missing: {ref - roles}"
+            )
+
+    def test_all_three_have_the_same_index_count(self):
+        counts = {t: len(r) for t, r in self._role_sets().items()}
+        assert len(set(counts.values())) == 1, f"index counts differ: {counts}"
+
+
+# ---------------------------------------------------------------------------
 # the one intended difference, and the dropped trigram index
 # ---------------------------------------------------------------------------
 
