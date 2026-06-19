@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -38,6 +39,9 @@ def get_latest_release(con):
 
 
 def execute_sql(con, sql, drop=False):
+    # Strip `-- ...` line comments before splitting on `;`. Otherwise a
+    # semicolon inside a comment would sever a real statement mid-line.
+    sql = re.sub(r"--[^\n]*", "", sql)
     for statement in sql.split(";"):
         statement = statement.strip()
         if not statement:
