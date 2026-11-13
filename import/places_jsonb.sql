@@ -15,8 +15,8 @@ SELECT
     CAST(regexp_replace(CAST(to_json({
         'name':                names.primary,
         'basic_category':      basic_category,
-        'primary_category':    categories.primary,
-        'alternate_categories': categories.alternate,
+        'primary_category':    taxonomy.primary,
+        'alternate_categories': taxonomy.alternates,
         'confidence':          confidence,
         'primary_country':     addresses[1].country,
         'primary_region':      addresses[1].region,
