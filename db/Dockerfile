@@ -1,6 +1,6 @@
 # PostGIS + H3 extension for Postgres
 # Base image is the same PostGIS image we already use, we just add the h3 extension.
-FROM postgis/postgis:17-3.5
+FROM postgis/postgis:17-3.6
 
 # Build deps for PG extension compilation
 RUN apt-get update \
