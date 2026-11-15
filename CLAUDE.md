@@ -57,4 +57,5 @@ SELECT ...    -- statement 3 → name3 (trailing semicolon optional)
 - Use `h3_latlng_to_cell` not `h3_lat_lng_to_cell` (deprecated)
 - PostgreSQL `round(double precision, int)` doesn't exist — cast to `::numeric` first
 - `psql -v` variables only expand from stdin/file, not `-c` flag
+- No `;` inside SQL comments in query files — `benchmark.py` splits statements on `;` naively
 - DDL in benchmark: `conn.autocommit = True`, check `cur.description` before `fetchall()`

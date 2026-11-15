@@ -56,7 +56,7 @@ SELECT cell, res, place_count,
        -- the postgis `geometry` type resolution when inlined into the MV
        -- query (search_path quirk). Calling the WKB form directly and
        -- casting via the fully-qualified type sidesteps it. h3 cells are in
-       -- WGS84; the WKB has no SRID embedded so we force 4326 — without it
+       -- WGS84. The WKB has no SRID embedded so we force 4326 — without it
        -- the geometry column registers as SRID 0 in geometry_columns and
        -- pg_tileserv refuses to serve the layer (can't reproject to Web
        -- Mercator). The double cast is required: ST_SetSRID alone returns a
